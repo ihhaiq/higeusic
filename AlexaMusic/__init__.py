@@ -12,13 +12,10 @@ as you want or you can collabe if you have new ideas.
 import asyncio
 import sys
 
-import config
-
 from AlexaMusic.core.bot import AlexaBot
 from AlexaMusic.core.dir import dirr
-from AlexaMusic.core.git import git
 from AlexaMusic.core.userbot import Userbot
-from AlexaMusic.misc import dbb, heroku
+from AlexaMusic.misc import dbb
 
 from .logging import LOGGER
 
@@ -35,16 +32,8 @@ if sys.platform != "win32":
 # Directories
 dirr()
 
-# Check Git Updates only when explicitly enabled.
-# Railway already deploys the selected GitHub commit, so runtime pulls are disabled by default.
-if config.ENABLE_GIT_UPDATE:
-    git()
-
 # Initialize Memory DB
 dbb()
-
-# Heroku APP
-heroku()
 
 # Bot Client
 app = AlexaBot()
