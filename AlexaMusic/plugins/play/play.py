@@ -42,7 +42,7 @@ from AlexaMusic.utils.database import is_served_user
 PLAY_COMMAND = get_command("PLAY_COMMAND")
 
 
-@app.on_message(filters.command(PLAY_COMMAND) & filters.group & ~BANNED_USERS)
+@app.on_message(filters.command(PLAY_COMMAND) & (filters.group | filters.channel) & ~BANNED_USERS)
 @PlayWrapper
 async def play_commnd(
     client,
@@ -62,8 +62,13 @@ async def play_commnd(
     slider = None
     plist_type = None
     spotify = None
-    user_id = message.from_user.id
-    user_name = message.from_user.first_name
+    if message.from_user:
+        user_id = user_id
+        user_name = user_name
+    else:
+        # Channel posts don't expose the posting admin as from_user.
+        user_id = config.OWNER_ID
+        user_name = message.author_signature or message.chat.title or "Channel"
     audio_telegram = (
         (message.reply_to_message.audio or message.reply_to_message.voice)
         if message.reply_to_message
@@ -165,7 +170,7 @@ async def play_commnd(
                     details = await YouTube.playlist(
                         url,
                         config.PLAYLIST_FETCH_LIMIT,
-                        message.from_user.id,
+                        user_id,
                     )
                 except Exception as e:
                     print(e)
@@ -213,7 +218,7 @@ async def play_commnd(
                 streamtype = "playlist"
                 plist_type = "spplay"
                 img = config.SPOTIFY_PLAYLIST_IMG_URL
-                cap = _["play_12"].format(message.from_user.first_name)
+                cap = _["play_12"].format(user_name)
             elif "album" in url:
                 try:
                     details, plist_id = await Spotify.album(url)
@@ -222,7 +227,7 @@ async def play_commnd(
                 streamtype = "playlist"
                 plist_type = "spalbum"
                 img = config.SPOTIFY_ALBUM_IMG_URL
-                cap = _["play_12"].format(message.from_user.first_name)
+                cap = _["play_12"].format(user_name)
             elif "artist" in url:
                 try:
                     details, plist_id = await Spotify.artist(url)
@@ -231,7 +236,7 @@ async def play_commnd(
                 streamtype = "playlist"
                 plist_type = "spartist"
                 img = config.SPOTIFY_ARTIST_IMG_URL
-                cap = _["play_12"].format(message.from_user.first_name)
+                cap = _["play_12"].format(user_name)
             else:
                 return await mystic.edit_text(_["play_17"])
         elif await Apple.valid(url):
@@ -251,7 +256,7 @@ async def play_commnd(
                     return await mystic.edit_text(_["play_3"])
                 streamtype = "playlist"
                 plist_type = "apple"
-                cap = _["play_13"].format(message.from_user.first_name)
+                cap = _["play_13"].format(user_name)
                 img = url
             else:
                 return await mystic.edit_text(_["play_16"])
@@ -311,10 +316,10 @@ async def play_commnd(
                 await stream(
                     _,
                     mystic,
-                    message.from_user.id,
+                    user_id,
                     url,
                     chat_id,
-                    message.from_user.first_name,
+                    user_name,
                     message.chat.id,
                     video=video,
                     streamtype="index",
@@ -394,7 +399,7 @@ async def play_commnd(
             buttons = playlist_markup(
                 _,
                 ran_hash,
-                message.from_user.id,
+                user_id,
                 plist_type,
                 "c" if channel else "g",
                 "f" if fplay else "d",
@@ -411,7 +416,7 @@ async def play_commnd(
                 buttons = slider_markup(
                     _,
                     track_id,
-                    message.from_user.id,
+                    user_id,
                     query,
                     0,
                     "c" if channel else "g",
@@ -431,7 +436,7 @@ async def play_commnd(
                 buttons = track_markup(
                     _,
                     track_id,
-                    message.from_user.id,
+                    user_id,
                     "c" if channel else "g",
                     "f" if fplay else "d",
                 )
