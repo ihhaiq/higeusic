@@ -22,4 +22,6 @@ RUN python3.12 -m pip install --upgrade pip && \
 
 COPY . .
 
+RUN python3.12 -m compileall -q AlexaMusic config strings genstring.py
+
 CMD ["bash", "start"]
