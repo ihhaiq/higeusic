@@ -15,7 +15,6 @@ async def bot_added(_, message):
     try:
         if not await is_on_off(LOG):
             return
-        userbot = await get_assistant(message.chat.id)
         chat = message.chat
         for members in message.new_chat_members:
             if members.id == app.id:
@@ -42,8 +41,6 @@ async def bot_added(_, message):
                         ]
                     ),
                 )
-                if message.chat.username:
-                    await userbot.join_chat(message.chat.username)
     except Exception:
         pass
 
