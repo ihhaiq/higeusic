@@ -9,7 +9,6 @@ This program is free software: you can redistribute it and can modify
 as you want or you can collabe if you have new ideas.
 """
 
-import config
 from pyrogram.types import InlineKeyboardButton
 
 
@@ -25,11 +24,5 @@ def song_markup(_, vidid):
                 callback_data=f"song_helper video|{vidid}",
             ),
         ],
-        [
-            InlineKeyboardButton(
-                text="🌻 sᴜᴩᴩᴏʀᴛ 🌻",
-                url=config.SUPPORT_GROUP,
-            ),
-            InlineKeyboardButton(text=_["CLOSE_BUTTON"], callback_data="close"),
-        ],
+        [InlineKeyboardButton(text=_["CLOSE_BUTTON"], callback_data="close")],
     ]
