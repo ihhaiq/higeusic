@@ -49,13 +49,13 @@ def PlayWrapper(command):
 
         if await is_maintenance() is False and actor_id not in SUDOERS:
             return await message.reply_text(
-                "Bot is under maintenance. Please wait for some time..."
+                "البوت في وضع الصيانة حالياً. يرجى المحاولة لاحقاً."
             )
         if PRIVATE_BOT_MODE == str(True) and not await is_served_private_chat(
             message.chat.id
         ):
             await message.reply_text(
-                "**Private Music Bot**\n\nOnly for authorized chats from the owner. Ask my owner to allow your chat first."
+                "**بوت موسيقى خاص**\n\nهذه المحادثة غير مخولة لاستخدام البوت. اطلب من المالك تخويلها أولاً."
             )
             return await app.leave_chat(message.chat.id)
         if not is_channel_post and await is_commanddelete_on(message.chat.id):
@@ -95,7 +95,7 @@ def PlayWrapper(command):
                 [
                     [
                         InlineKeyboardButton(
-                            text="How to Fix this? ",
+                            text="طريقة الحل",
                             callback_data="AnonymousAdmin",
                         ),
                     ]
