@@ -11,7 +11,7 @@ as you want or you can collabe if you have new ideas.
 
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from pyrogram.enums import ChatType, ChatMemberStatus
-from config import SUPPORT_GROUP, adminlist
+from config import adminlist
 from strings import get_string
 from AlexaMusic import app
 from AlexaMusic.misc import SUDOERS
@@ -31,7 +31,7 @@ def AdminRightsCheck(mystic):
     async def wrapper(client, message):
         if await is_maintenance() is False and message.from_user.id not in SUDOERS:
             return await message.reply_text(
-                text=f"{app.mention} ɪs ᴜɴᴅᴇʀ ᴍᴀɪɴᴛᴇɴᴀɴᴄᴇ, ᴠɪsɪᴛ <a href={SUPPORT_GROUP}>sᴜᴘᴘᴏʀᴛ ᴄʜᴀᴛ</a> ғᴏʀ ᴋɴᴏᴡɪɴɢ ᴛʜᴇ ʀᴇᴀsᴏɴ.",
+                text=f"{app.mention} في وضع الصيانة حالياً. يرجى المحاولة لاحقاً.",
                 disable_web_page_preview=True,
             )
 
@@ -85,7 +85,7 @@ def AdminActual(mystic):
     async def wrapper(client, message):
         if await is_maintenance() is False and message.from_user.id not in SUDOERS:
             return await message.reply_text(
-                text=f"{app.mention} ɪs ᴜɴᴅᴇʀ ᴍᴀɪɴᴛᴇɴᴀɴᴄᴇ, ᴠɪsɪᴛ <a href={SUPPORT_GROUP}>sᴜᴘᴘᴏʀᴛ ᴄʜᴀᴛ</a> ғᴏʀ ᴋɴᴏᴡɪɴɢ ᴛʜᴇ ʀᴇᴀsᴏɴ.",
+                text=f"{app.mention} في وضع الصيانة حالياً. يرجى المحاولة لاحقاً.",
                 disable_web_page_preview=True,
             )
 
