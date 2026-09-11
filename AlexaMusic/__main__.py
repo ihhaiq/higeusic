@@ -44,22 +44,42 @@ async def init() -> None:
     for module in ALL_MODULES:
         importlib.import_module(f"AlexaMusic.plugins{module}")
     LOGGER("AlexaMusic.plugins").info("Necessary Modules Imported Successfully.")
-    await userbot.start()
-    await Alexa.start()
+    assistant_started = False
     try:
-        await Alexa.stream_call("https://telegra.ph/file/b60b80ccb06f7a48f68b5.mp4")
-    except NoActiveGroupCall:
+        await userbot.start()
+        assistant_started = True
+    except Exception as error:
         LOGGER("AlexaMusic").error(
-            "[ERROR] - \n\nTurn on group voice chat and don't put it off otherwise I'll stop working thanks."
+            "Assistant failed to start: %s. "
+            "The bot will stay online in limited mode, but music playback is unavailable. "
+            "Regenerate STRING_SESSION with this project's genstring.py.",
+            error,
         )
-        exit()
-    except Exception:
-        pass
-    await Alexa.decorators()
-    LOGGER("AlexaMusic").info("Alexa Music Bot Started Successfully")
+
+    if assistant_started:
+        await Alexa.start()
+        try:
+            await Alexa.stream_call("https://telegra.ph/file/b60b80ccb06f7a48f68b5.mp4")
+        except NoActiveGroupCall:
+            LOGGER("AlexaMusic").warning(
+                "No active voice chat found during startup check. "
+                "Bot will remain online; start a voice chat before using playback."
+            )
+        except Exception as error:
+            LOGGER("AlexaMusic").warning(
+                "Startup voice-call check failed: %s. Bot will remain online.", error
+            )
+        await Alexa.decorators()
+        LOGGER("AlexaMusic").info("Alexa Music Bot Started Successfully")
+    else:
+        LOGGER("AlexaMusic").warning(
+            "Alexa Music Bot Started in LIMITED MODE without an assistant."
+        )
+
     await idle()
     await app.stop()
-    await userbot.stop()
+    if assistant_started:
+        await userbot.stop()
     LOGGER("AlexaMusic").info("Stopping Alexa Music Bot...")
 
 
