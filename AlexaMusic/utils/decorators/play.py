@@ -37,6 +37,7 @@ from AlexaMusic.utils.database import (
 )
 from AlexaMusic.utils.database.memorydatabase import is_maintenance
 from AlexaMusic.utils.inline.playlist import botplaylist_markup
+from AlexaMusic.utils.exceptions import AssistantErr
 
 links = {}
 
@@ -133,7 +134,10 @@ def PlayWrapper(command):
             fplay = None
 
         if not await is_active_chat(chat_id):
-            userbot = await get_assistant(chat_id)
+            try:
+                userbot = await get_assistant(chat_id)
+            except AssistantErr as error:
+                return await message.reply_text(str(error))
             try:
                 try:
                     get = await app.get_chat_member(chat_id, userbot.id)
