@@ -29,7 +29,7 @@ from AlexaMusic.core.cookies import save_cookies
 async def init() -> None:
     # Check for at least one valid Pyrogram string session
     if all(not getattr(config, f"STRING{i}") for i in range(1, 6)):
-        LOGGER("AlexaMusic").error("Add Pyrogram string session and then try...")
+        LOGGER("AlexaMusic").error("أضف جلسة Pyrogram للحساب المساعد ثم حاول مرة أخرى.")
         exit()
     await sudo()
     try:
@@ -50,9 +50,9 @@ async def init() -> None:
         assistant_started = True
     except Exception as error:
         LOGGER("AlexaMusic").error(
-            "Assistant failed to start: %s. "
-            "The bot will stay online in limited mode, but music playback is unavailable. "
-            "Regenerate STRING_SESSION with this project's genstring.py.",
+            "فشل تشغيل الحساب المساعد: %s. "
+            "سيبقى البوت متصلاً في الوضع المحدود، لكن تشغيل الموسيقى غير متاح. "
+            "أعد إنشاء STRING_SESSION باستخدام genstring.py الموجود في المشروع.",
             error,
         )
 
@@ -62,27 +62,27 @@ async def init() -> None:
             await Alexa.stream_call("https://telegra.ph/file/b60b80ccb06f7a48f68b5.mp4")
         except NoActiveGroupCall:
             LOGGER("AlexaMusic").warning(
-                "No active voice chat found during startup check. "
-                "Bot will remain online; start a voice chat before using playback."
+                "لم يتم العثور على محادثة صوتية فعالة أثناء فحص بدء التشغيل. "
+                "سيبقى البوت متصلاً؛ افتح محادثة صوتية قبل التشغيل."
             )
         except Exception as error:
             LOGGER("AlexaMusic").warning(
-                "Startup voice-call check failed: %s. Bot will remain online.", error
+                "فشل فحص المكالمة عند بدء التشغيل: %s. سيبقى البوت متصلاً.", error
             )
         await Alexa.decorators()
-        LOGGER("AlexaMusic").info("Alexa Music Bot Started Successfully")
+        LOGGER("AlexaMusic").info("تم تشغيل بوت الموسيقى بنجاح")
     else:
         LOGGER("AlexaMusic").warning(
-            "Alexa Music Bot Started in LIMITED MODE without an assistant."
+            "تم تشغيل بوت الموسيقى في الوضع المحدود بدون حساب مساعد."
         )
 
     await idle()
     await app.stop()
     if assistant_started:
         await userbot.stop()
-    LOGGER("AlexaMusic").info("Stopping Alexa Music Bot...")
+    LOGGER("AlexaMusic").info("جاري إيقاف بوت الموسيقى...")
 
 
 if __name__ == "__main__":
     asyncio.get_event_loop().run_until_complete(init())
-    LOGGER("AlexaMusic").info("Stopping Music Bot")
+    LOGGER("AlexaMusic").info("تم إيقاف بوت الموسيقى")
