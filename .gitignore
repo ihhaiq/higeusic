@@ -9,3 +9,4 @@ downloads/
 __pycache__/
 *.session-journal
 data/database.json
+cookies/*.txt
