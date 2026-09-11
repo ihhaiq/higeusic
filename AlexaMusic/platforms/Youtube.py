@@ -27,9 +27,17 @@ from AlexaMusic.utils.formatters import time_to_seconds
 
 def cookiefile():
     cookie_dir = "cookies"
+    if not os.path.isdir(cookie_dir):
+        return None
     cookies_files = [f for f in os.listdir(cookie_dir) if f.endswith(".txt")]
-
+    if not cookies_files:
+        return None
     return os.path.join(cookie_dir, cookies_files[0])
+
+
+def cookie_args():
+    path = cookiefile()
+    return ["--cookies", path] if path else []
 
 
 class YouTubeAPI:
@@ -121,8 +129,7 @@ class YouTubeAPI:
             link = link.split("&")[0]
         proc = await asyncio.create_subprocess_exec(
             "yt-dlp",
-            "--cookies",
-            cookiefile(),
+            *cookie_args(),
             "-g",
             "-f",
             "best[height<=?720][width<=?1280]",
@@ -342,8 +349,7 @@ class YouTubeAPI:
             else:
                 proc = await asyncio.create_subprocess_exec(
                     "yt-dlp",
-                    "--cookies",
-                    cookiefile(),
+                    *cookie_args(),
                     "-g",
                     "-f",
                     "best[height<=?720][width<=?1280]",
