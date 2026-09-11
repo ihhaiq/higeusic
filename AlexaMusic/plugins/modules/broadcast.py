@@ -20,12 +20,11 @@ import config
 from config import adminlist, chatstats, clean, userstats
 from pyrogram.enums import ChatMembersFilter
 from strings import get_command
-from AlexaMusic import app, userbot
+from AlexaMusic import app
 from AlexaMusic.misc import SUDOERS
 from AlexaMusic.utils.database import (
     get_active_chats,
     get_authuser_names,
-    get_client,
     get_particular_top,
     get_served_chats,
     get_served_users,
@@ -75,7 +74,7 @@ async def clean_mode(client, update, users, chats):
     await set_queries(1)
 
 
-@app.on_message(filters.command(BROADCAST_COMMAND) & SUDOERS)
+@app.on_message(filters.command(BROADCAST_COMMAND) & filters.user(OWNER_ID))
 @language
 async def braodcast_message(client, message, _):
     global IS_BROADCASTING
@@ -92,8 +91,6 @@ async def braodcast_message(client, message, _):
             query = query.replace("-nobot", "")
         if "-pinloud" in query:
             query = query.replace("-pinloud", "")
-        if "-assistant" in query:
-            query = query.replace("-assistant", "")
         if "-user" in query:
             query = query.replace("-user", "")
         if query == "":
@@ -166,38 +163,6 @@ async def braodcast_message(client, message, _):
         except Exception:
             pass
 
-    # Bot broadcasting by assistant
-    if "-assistant" in message.text:
-        aw = await message.reply_text(_["broad_2"])
-        text = _["broad_3"]
-        from AlexaMusic.core.userbot import assistants
-
-        for num in assistants:
-            sent = 0
-            client = await get_client(num)
-            async for dialog in client.get_dialogs():
-                if dialog.chat.id == config.LOG_GROUP_ID:
-                    continue
-                try:
-                    (
-                        await client.forward_messages(dialog.chat.id, y, x)
-                        if message.reply_to_message
-                        else await client.send_message(dialog.chat.id, text=query)
-                    )
-                    sent += 1
-                except FloodWait as e:
-                    flood_time = int(e.value)
-                    if flood_time > 200:
-                        continue
-                    await asyncio.sleep(flood_time)
-                except Exception as e:
-                    print(e)
-                    continue
-            text += _["broad_4"].format(num, sent)
-        try:
-            await aw.edit_text(text)
-        except Exception:
-            pass
     IS_BROADCASTING = False
 
 
