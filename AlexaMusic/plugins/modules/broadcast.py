@@ -21,7 +21,6 @@ from config import adminlist, chatstats, clean, userstats
 from pyrogram.enums import ChatMembersFilter
 from strings import get_command
 from AlexaMusic import app
-from AlexaMusic.misc import SUDOERS
 from AlexaMusic.utils.database import (
     get_active_chats,
     get_authuser_names,
