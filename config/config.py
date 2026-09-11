@@ -89,7 +89,6 @@ TG_VIDEO_FILESIZE_LIMIT = int(getenv("TG_VIDEO_FILESIZE_LIMIT", "1073741824"))
 # https://www.gbmb.org/mb-to-bytes
 
 COOKIES = getenv("COOKIES", None)
-# https://batbin.me
 
 def _session_env(name: str):
     value = getenv(name, None)
@@ -117,9 +116,7 @@ clean = {}
 
 autoclean = []
 
-START_IMG_URL = getenv(
-    "START_IMG_URL", "https://telegra.ph/file/d593c6064ff7657d0c714.jpg"
-)
+START_IMG_URL = getenv("START_IMG_URL", "assets/Ping.jpeg")
 
 PING_IMG_URL = getenv(
     "PING_IMG_URL",
@@ -189,24 +186,6 @@ def time_to_seconds(time):
 
 DURATION_LIMIT = int(time_to_seconds(f"{DURATION_LIMIT_MIN}:00"))
 SONG_DOWNLOAD_DURATION_LIMIT = int(time_to_seconds(f"{SONG_DOWNLOAD_DURATION}:00"))
-
-if SUPPORT_CHANNEL and not re.match("(?:http|https)://", SUPPORT_CHANNEL):
-    print(
-        "[ERROR] - Your SUPPORT_CHANNEL url is wrong. Please ensure that it starts with https://"
-    )
-    sys.exit()
-
-if SUPPORT_GROUP and not re.match("(?:http|https)://", SUPPORT_GROUP):
-    print(
-        "[ERROR] - Your SUPPORT_GROUP url is wrong. Please ensure that it starts with https://"
-    )
-    sys.exit()
-
-if UPSTREAM_REPO and not re.match("(?:http|https)://", UPSTREAM_REPO):
-    print(
-        "[ERROR] - Your UPSTREAM_REPO url is wrong. Please ensure that it starts with https://"
-    )
-    sys.exit()
 
 if GITHUB_REPO and not re.match("(?:http|https)://", GITHUB_REPO):
     print(
