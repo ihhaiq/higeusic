@@ -60,7 +60,7 @@ class Userbot(Client):
         )
 
     async def start(self):
-        LOGGER(__name__).info(f"Starting Assistant Clients...")
+        LOGGER(__name__).info("جاري تشغيل حسابات المساعد...")
         if config.STRING1:
             await self.one.start()
             try:
@@ -73,11 +73,11 @@ class Userbot(Client):
             try:
                 await self.one.send_message(
                     config.LOG_GROUP_ID,
-                    "ᴀssɪsᴛᴀɴᴛ sᴛᴀʀᴛᴇᴅ, ɴᴏᴡ ɪᴛ's ᴛɪᴍᴇ ᴛᴏ ᴇɴᴊᴏʏ ᴍᴜsɪᴄ ᴏɴ ᴛᴇʟᴇɢʀᴀᴍ ᴠɪᴅᴇᴏᴄʜᴀᴛs.",
+                    "✅ تم تشغيل الحساب المساعد وأصبح جاهزاً لتشغيل الصوت والفيديو في مكالمات تيليجرام.",
                 )
             except Exception:
                 LOGGER(__name__).error(
-                    f"Assistant Account 1 has failed to access the log Group. Make sure that you have added your assistant to your log group and promoted as admin ! "
+                    f"فشل الحساب المساعد 1 في الوصول إلى مجموعة السجل. أضفه إليها وارفعه مشرفاً."
                 )
                 sys.exit()
             get_me = await self.one.get_me()
@@ -88,7 +88,7 @@ class Userbot(Client):
                 self.one.name = get_me.first_name + " " + get_me.last_name
             else:
                 self.one.name = get_me.first_name
-            LOGGER(__name__).info(f"Assistant Started as {self.one.name}")
+            LOGGER(__name__).info(f"تم تشغيل المساعد باسم {self.one.name}")
         if config.STRING2:
             await self.two.start()
             try:
@@ -101,11 +101,11 @@ class Userbot(Client):
             try:
                 await self.two.send_message(
                     config.LOG_GROUP_ID,
-                    "ᴀssɪsᴛᴀɴᴛ sᴛᴀʀᴛᴇᴅ, ɴᴏᴡ ɪᴛ's ᴛɪᴍᴇ ᴛᴏ ᴇɴᴊᴏʏ ᴍᴜsɪᴄ ᴏɴ ᴛᴇʟᴇɢʀᴀᴍ ᴠɪᴅᴇᴏᴄʜᴀᴛs.",
+                    "✅ تم تشغيل الحساب المساعد وأصبح جاهزاً لتشغيل الصوت والفيديو في مكالمات تيليجرام.",
                 )
             except Exception:
                 LOGGER(__name__).error(
-                    f"Assistant Account 2 has failed to access the log Group. Make sure that you have added your assistant to your log group and promoted as admin ! "
+                    f"فشل الحساب المساعد 2 في الوصول إلى مجموعة السجل. أضفه إليها وارفعه مشرفاً."
                 )
                 sys.exit()
             get_me = await self.two.get_me()
@@ -116,7 +116,7 @@ class Userbot(Client):
                 self.two.name = get_me.first_name + " " + get_me.last_name
             else:
                 self.two.name = get_me.first_name
-            LOGGER(__name__).info(f"Assistant Two Started as {self.two.name}")
+            LOGGER(__name__).info(f"تم تشغيل المساعد الثاني باسم {self.two.name}")
         if config.STRING3:
             await self.three.start()
             try:
@@ -129,11 +129,11 @@ class Userbot(Client):
             try:
                 await self.three.send_message(
                     config.LOG_GROUP_ID,
-                    "ᴀssɪsᴛᴀɴᴛ sᴛᴀʀᴛᴇᴅ, ɴᴏᴡ ɪᴛ's ᴛɪᴍᴇ ᴛᴏ ᴇɴᴊᴏʏ ᴍᴜsɪᴄ ᴏɴ ᴛᴇʟᴇɢʀᴀᴍ ᴠɪᴅᴇᴏᴄʜᴀᴛs.",
+                    "✅ تم تشغيل الحساب المساعد وأصبح جاهزاً لتشغيل الصوت والفيديو في مكالمات تيليجرام.",
                 )
             except Exception:
                 LOGGER(__name__).error(
-                    f"Assistant Account 3 has failed to access the log Group. Make sure that you have added your assistant to your log group and promoted as admin ! "
+                    f"فشل الحساب المساعد 3 في الوصول إلى مجموعة السجل. أضفه إليها وارفعه مشرفاً."
                 )
                 sys.exit()
             get_me = await self.three.get_me()
@@ -144,7 +144,7 @@ class Userbot(Client):
                 self.three.name = get_me.first_name + " " + get_me.last_name
             else:
                 self.three.name = get_me.first_name
-            LOGGER(__name__).info(f"Assistant Three Started as {self.three.name}")
+            LOGGER(__name__).info(f"تم تشغيل المساعد الثالث باسم {self.three.name}")
         if config.STRING4:
             await self.four.start()
             try:
@@ -157,11 +157,11 @@ class Userbot(Client):
             try:
                 await self.four.send_message(
                     config.LOG_GROUP_ID,
-                    "ᴀssɪsᴛᴀɴᴛ sᴛᴀʀᴛᴇᴅ, ɴᴏᴡ ɪᴛ's ᴛɪᴍᴇ ᴛᴏ ᴇɴᴊᴏʏ ᴍᴜsɪᴄ ᴏɴ ᴛᴇʟᴇɢʀᴀᴍ ᴠɪᴅᴇᴏᴄʜᴀᴛs.",
+                    "✅ تم تشغيل الحساب المساعد وأصبح جاهزاً لتشغيل الصوت والفيديو في مكالمات تيليجرام.",
                 )
             except Exception:
                 LOGGER(__name__).error(
-                    f"Assistant Account 4 has failed to access the log Group. Make sure that you have added your assistant to your log group and promoted as admin ! "
+                    f"فشل الحساب المساعد 4 في الوصول إلى مجموعة السجل. أضفه إليها وارفعه مشرفاً."
                 )
                 sys.exit()
             get_me = await self.four.get_me()
@@ -172,7 +172,7 @@ class Userbot(Client):
                 self.four.name = get_me.first_name + " " + get_me.last_name
             else:
                 self.four.name = get_me.first_name
-            LOGGER(__name__).info(f"Assistant Four Started as {self.four.name}")
+            LOGGER(__name__).info(f"تم تشغيل المساعد الرابع باسم {self.four.name}")
         if config.STRING5:
             await self.five.start()
             try:
@@ -185,11 +185,11 @@ class Userbot(Client):
             try:
                 await self.five.send_message(
                     config.LOG_GROUP_ID,
-                    "ᴀssɪsᴛᴀɴᴛ sᴛᴀʀᴛᴇᴅ, ɴᴏᴡ ɪᴛ's ᴛɪᴍᴇ ᴛᴏ ᴇɴᴊᴏʏ ᴍᴜsɪᴄ ᴏɴ ᴛᴇʟᴇɢʀᴀᴍ ᴠɪᴅᴇᴏᴄʜᴀᴛs.",
+                    "✅ تم تشغيل الحساب المساعد وأصبح جاهزاً لتشغيل الصوت والفيديو في مكالمات تيليجرام.",
                 )
             except Exception:
                 LOGGER(__name__).error(
-                    f"Assistant Account 5 has failed to access the log Group. Make sure that you have added your assistant to your log group and promoted as admin ! "
+                    f"فشل الحساب المساعد 5 في الوصول إلى مجموعة السجل. أضفه إليها وارفعه مشرفاً."
                 )
                 sys.exit()
             get_me = await self.five.get_me()
@@ -200,4 +200,4 @@ class Userbot(Client):
                 self.five.name = get_me.first_name + " " + get_me.last_name
             else:
                 self.five.name = get_me.first_name
-            LOGGER(__name__).info(f"Assistant Five Started as {self.five.name}")
+            LOGGER(__name__).info(f"تم تشغيل المساعد الخامس باسم {self.five.name}")
