@@ -35,23 +35,7 @@ MUSIC_BOT_NAME = getenv("MUSIC_BOT_NAME")
 
 OWNER_ID = int(getenv("OWNER_ID", None))
 
-HEROKU_API_KEY = getenv("HEROKU_API_KEY")
-
 BOT_ID = getenv("BOT_ID")
-
-HEROKU_APP_NAME = getenv("HEROKU_APP_NAME")
-
-UPSTREAM_REPO = getenv("UPSTREAM_REPO", "https://github.com/ihhaiq/higeusic")
-
-UPSTREAM_BRANCH = getenv("UPSTREAM_BRANCH", "master")
-
-ENABLE_GIT_UPDATE = getenv("ENABLE_GIT_UPDATE", "False").lower() == "true"
-
-GIT_TOKEN = getenv("GIT_TOKEN", None)
-
-SUPPORT_CHANNEL = getenv("SUPPORT_CHANNEL", "https://t.me/Alexa_BotUpdates")
-
-SUPPORT_GROUP = getenv("SUPPORT_GROUP", "https://t.me/Alexa_Help")
 
 AUTO_LEAVING_ASSISTANT = getenv("AUTO_LEAVING_ASSISTANT", "False")
 
