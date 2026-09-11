@@ -41,6 +41,10 @@ class AlexaBot(Client):
                     f"Telegram فرض انتظاراً لمدة {wait_seconds} ثانية قبل إعادة تسجيل دخول البوت. "
                     "سيبقى السيرفر يعمل وينتظر تلقائياً بدون إعادة تشغيل متكررة."
                 )
+                try:
+                    await self.disconnect()
+                except Exception:
+                    pass
                 await asyncio.sleep(wait_seconds + 5)
 
         get_me = await self.get_me()
