@@ -33,8 +33,10 @@ if sys.platform != "win32":
 # Directories
 dirr()
 
-# Check Git Updates
-git()
+# Check Git Updates only when explicitly enabled.
+# Railway already deploys the selected GitHub commit, so runtime pulls are disabled by default.
+if config.ENABLE_GIT_UPDATE:
+    git()
 
 # Initialize Memory DB
 dbb()
