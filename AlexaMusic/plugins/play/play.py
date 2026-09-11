@@ -63,8 +63,8 @@ async def play_commnd(
     plist_type = None
     spotify = None
     if message.from_user:
-        user_id = user_id
-        user_name = user_name
+        user_id = message.from_user.id
+        user_name = message.from_user.first_name
     else:
         # Channel posts don't expose the posting admin as from_user.
         user_id = config.OWNER_ID
