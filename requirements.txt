@@ -1,11 +1,7 @@
 aiofiles
 aiohttp
 beautifulsoup4
-Flask
-gitpython
-gunicorn
 hachoir
-heroku3
 lyricsgenius
 motor
 ntgcalls
@@ -19,7 +15,6 @@ speedtest-cli
 spotipy
 unidecode
 uvloop==0.21.0
-werkzeug
 yt-dlp[default]>=2026.3.17
 https://github.com/KurimuzonAkuma/pyrogram/archive/dev.zip
 https://github.com/KSKOP69/youtube-search-python/archive/ksk.zip
