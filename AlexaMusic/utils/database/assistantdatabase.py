@@ -38,11 +38,11 @@ async def set_assistant(chat_id):
 
     if not assistants:
         raise AssistantErr(
-            "No assistant account is available. Fix STRING_SESSION and redeploy the bot."
+            "لا يوجد حساب مساعد فعّال. أصلح STRING_SESSION ثم أعد نشر البوت."
         )
     if not assistants:
         raise AssistantErr(
-            "No assistant account is available. Fix STRING_SESSION and redeploy the bot."
+            "لا يوجد حساب مساعد فعّال. أصلح STRING_SESSION ثم أعد نشر البوت."
         )
     ran_assistant = random.choice(assistants)
     assistantdict[chat_id] = ran_assistant
