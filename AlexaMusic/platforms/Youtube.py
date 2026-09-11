@@ -32,21 +32,6 @@ def cookiefile():
     return os.path.join(cookie_dir, cookies_files[0])
 
 
-async def shell_cmd(cmd):
-    proc = await asyncio.create_subprocess_shell(
-        cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    out, errorz = await proc.communicate()
-    if errorz:
-        if "unavailable videos are hidden" in (errorz.decode("utf-8")).lower():
-            return out.decode("utf-8")
-        else:
-            return errorz.decode("utf-8")
-    return out.decode("utf-8")
-
-
 class YouTubeAPI:
     def __init__(self):
         self.base = "https://www.youtube.com/watch?v="
@@ -153,12 +138,22 @@ class YouTubeAPI:
             link = self.listbase + link
         if "&" in link:
             link = link.split("&")[0]
-        cmd = (
-            f"yt-dlp -i --compat-options no-youtube-unavailable-videos "
-            f"--get-id --flat-playlist --playlist-end {limit} --skip-download '{link}' "
-            f"2>/dev/null"
+        proc = await asyncio.create_subprocess_exec(
+            "yt-dlp",
+            "-i",
+            "--compat-options",
+            "no-youtube-unavailable-videos",
+            "--get-id",
+            "--flat-playlist",
+            "--playlist-end",
+            str(limit),
+            "--skip-download",
+            link,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
         )
-        playlist = await shell_cmd(cmd)
+        stdout, _ = await proc.communicate()
+        playlist = stdout.decode("utf-8", "replace")
         try:
             result = [key for key in playlist.split("\n") if key]
         except Exception:
