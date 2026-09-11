@@ -13,6 +13,7 @@ import random
 
 from AlexaMusic import userbot
 from AlexaMusic.core.mongo import mongodb
+from AlexaMusic.utils.exceptions import AssistantErr
 
 db = mongodb.assistants
 
@@ -35,6 +36,14 @@ async def get_client(assistant: int):
 async def set_assistant(chat_id):
     from AlexaMusic.core.userbot import assistants
 
+    if not assistants:
+        raise AssistantErr(
+            "No assistant account is available. Fix STRING_SESSION and redeploy the bot."
+        )
+    if not assistants:
+        raise AssistantErr(
+            "No assistant account is available. Fix STRING_SESSION and redeploy the bot."
+        )
     ran_assistant = random.choice(assistants)
     assistantdict[chat_id] = ran_assistant
     await db.update_one(
