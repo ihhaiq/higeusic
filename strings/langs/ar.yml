@@ -9,8 +9,8 @@ general_5 : "تحتاج إلى صلاحية إدارة المحادثات الص
 general_6 : "لا يوجد بث يعمل حالياً في المحادثة الصوتية."
 
 # Classes - Telegram.py
-tg_1 : "** تم تحميل البوت ** الكثير ** من التنزيلات في الوقت الحالي.\n\n** حاول بعد ذلك: ** {0} (__expected time__)"
-tg_2 : "**فشل التنزيل اغاتي **"
+tg_1 : "<u><b>{0} - التنزيل</b></u>\n\n<b>حجم الملف:</b> {1}\n<b>تم تنزيل:</b> {2}\n<b>النسبة:</b> {3}%\n\n<b>السرعة:</b> {4}/ث\n<b>الوقت المتبقي:</b> {5}"
+tg_2 : "تم التنزيل بنجاح، جاري معالجة الملف...\n\n<b>الوقت المنقضي:</b> {0}"
 
 # Core - Call.py
 call_1 : "يحتاج البوت إلى صلاحية مناسبة لإضافة الحساب المساعد إلى القناة."
@@ -396,21 +396,21 @@ broad_6 : "الرجاء كتابة الاذاعه مع الامر."
 broad_7 : "**اذيعت الرسالة الى {0} مشترك.**"
 
 #Heroku
-heroku_1 : "Please make sure your Heroku API Key, Your App name are configured correctly in the heroku"
-heroku_2 : "You can only get logs of Heroku Apps"
-heroku_3 : "**Usage:**\n/get_var [Var Name]"
-heroku_4 : "Unable to find any such var."
-heroku_5 : ".env file not found."
-heroku_6 : "**Usage:**\n/del_var [Var Name]"
-heroku_7 : "{0} Deleted."
-heroku_8 : "**Usage:**\n/set_var [Var Name] [Var Value]"
-heroku_9 : "{0} has been updated successfully"
-heroku_10 : "{0} has been added successfully"
-heroku_11 : "Only for Heroku Apps"
-heroku_12 : "Checking Heroku Usage. Please Wait"
-heroku_13 : "Checking for available updates..."
-heroku_14 : "Git Command Error"
-heroku_15 : "Invalid Git Repsitory"
+heroku_1 : "تأكد من ضبط مفتاح Heroku API واسم التطبيق بصورة صحيحة."
+heroku_2 : "هذا الأمر متاح لتطبيقات Heroku فقط."
+heroku_3 : "**الاستخدام:**\n/get_var [اسم المتغير]"
+heroku_4 : "لم يتم العثور على هذا المتغير."
+heroku_5 : "ملف .env غير موجود."
+heroku_6 : "**الاستخدام:**\n/del_var [اسم المتغير]"
+heroku_7 : "تم حذف {0}."
+heroku_8 : "**الاستخدام:**\n/set_var [اسم المتغير] [القيمة]"
+heroku_9 : "تم تحديث {0} بنجاح."
+heroku_10 : "تمت إضافة {0} بنجاح."
+heroku_11 : "هذا الأمر متاح لتطبيقات Heroku فقط."
+heroku_12 : "جاري فحص استخدام Heroku، يرجى الانتظار..."
+heroku_13 : "جاري البحث عن تحديثات متاحة..."
+heroku_14 : "خطأ في أمر Git."
+heroku_15 : "مستودع Git غير صالح."
 
 #Private bot mode
 pbot_1 : "**إستعمال:**\n/authorize [معرف الدردشة]"
