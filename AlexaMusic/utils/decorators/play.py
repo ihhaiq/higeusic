@@ -11,7 +11,7 @@ as you want or you can collabe if you have new ideas.
 
 import asyncio
 
-from pyrogram.enums import ChatMemberStatus
+from pyrogram.enums import ChatMemberStatus, ChatType
 from pyrogram.errors import (
     ChatAdminRequired,
     InviteRequestSent,
@@ -20,7 +20,7 @@ from pyrogram.errors import (
 )
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-from config import PLAYLIST_IMG_URL, PRIVATE_BOT_MODE, adminlist
+from config import PLAYLIST_IMG_URL, PRIVATE_BOT_MODE, OWNER_ID, adminlist
 from AlexaMusic.misc import db
 from strings import get_string
 from AlexaMusic import YouTube, app
@@ -44,7 +44,10 @@ links = {}
 
 def PlayWrapper(command):
     async def wrapper(client, message):
-        if await is_maintenance() is False and message.from_user.id not in SUDOERS:
+        is_channel_post = message.chat.type == ChatType.CHANNEL
+        actor_id = message.from_user.id if message.from_user else OWNER_ID
+
+        if await is_maintenance() is False and actor_id not in SUDOERS:
             return await message.reply_text(
                 "Bot is under maintenance. Please wait for some time..."
             )
@@ -55,7 +58,7 @@ def PlayWrapper(command):
                 "**Private Music Bot**\n\nOnly for authorized chats from the owner. Ask my owner to allow your chat first."
             )
             return await app.leave_chat(message.chat.id)
-        if await is_commanddelete_on(message.chat.id):
+        if not is_channel_post and await is_commanddelete_on(message.chat.id):
             try:
                 await message.delete()
             except Exception:
@@ -87,7 +90,7 @@ def PlayWrapper(command):
                 caption=_["playlist_1"],
                 reply_markup=InlineKeyboardMarkup(buttons),
             )
-        if message.sender_chat:
+        if message.sender_chat and not is_channel_post:
             upl = InlineKeyboardMarkup(
                 [
                     [
@@ -99,7 +102,11 @@ def PlayWrapper(command):
                 ]
             )
             return await message.reply_text(_["general_4"], reply_markup=upl)
-        if message.command[0][0] == "c":
+        if is_channel_post:
+            # A /play post in a channel targets that channel's own voice chat.
+            chat_id = message.chat.id
+            channel = None
+        elif message.command[0][0] == "c":
             chat_id = await get_cmode(message.chat.id)
             if chat_id is None:
                 return await message.reply_text(_["setting_12"])
@@ -113,11 +120,13 @@ def PlayWrapper(command):
             channel = None
         playmode = await get_playmode(message.chat.id)
         playty = await get_playtype(message.chat.id)
-        if playty != "Everyone" and message.from_user.id not in SUDOERS:
+        # Only channel admins can publish channel posts, and Telegram doesn't
+        # expose the posting admin as from_user to bots.
+        if not is_channel_post and playty != "Everyone" and actor_id not in SUDOERS:
             admins = adminlist.get(message.chat.id)
             if not admins:
                 return await message.reply_text(_["admin_18"])
-            if message.from_user.id not in admins:
+            if actor_id not in admins:
                 return await message.reply_text(_["play_4"])
         if message.command[0][0] == "v":
             video = True
