@@ -1,28 +1,57 @@
-# Copyright (C) 2025 by Alexa_Help @ Github, < https://github.com/TheTeamAlexa >
-# Subscribe On YT < Jankari Ki Duniya >. All rights reserved. © Alexa © Yukki.
+"""Explicit plugin allowlist.
 
-"""
-TheTeamAlexa is a project of Telegram bots with variety of purposes.
-Copyright (c) 2021 ~ Present Team Alexa <https://github.com/TheTeamAlexa>
-
-This program is free software: you can redistribute it and can modify
-as you want or you can collabe if you have new ideas.
+Keeping the list explicit prevents an unexpected Python file dropped into the
+plugins directory from being imported automatically at startup.
 """
 
-import glob
-from os.path import dirname, isfile
+ALL_MODULES = [
+    ".admins.auth",
+    ".admins.callback",
+    ".admins.loop",
+    ".admins.mute",
+    ".admins.pause",
+    ".admins.resume",
+    ".admins.seek",
+    ".admins.shuffle",
+    ".admins.skip",
+    ".admins.stop",
+    ".admins.unmute",
+    ".bot.help",
+    ".bot.inline",
+    ".bot.settings",
+    ".bot.start",
+    ".misc.autoleave",
+    ".misc.seeker",
+    ".misc.suggestion",
+    ".modules.botwelcomlog",
+    ".modules.broadcast",
+    ".modules.id",
+    ".modules.punishment",
+    ".play.channel",
+    ".play.live",
+    ".play.play",
+    ".play.playlist",
+    ".play.playmode",
+    ".play.stream",
+    ".play.toptracks",
+    ".sudo.autoend",
+    ".sudo.blacklistchat",
+    ".sudo.block",
+    ".sudo.logger",
+    ".sudo.maintenance",
+    ".sudo.private",
+    ".sudo.sudoers",
+    ".sudo.videolimit",
+    ".sudo.videomode",
+    ".tools.active",
+    ".tools.languages",
+    ".tools.lyrics",
+    ".tools.ping",
+    ".tools.queue",
+    ".tools.reload",
+    ".tools.songs",
+    ".tools.speedtest",
+    ".tools.stats",
+]
 
-
-def __list_all_modules():
-    work_dir = dirname(__file__)
-    mod_paths = glob.glob(f"{work_dir}/*/*.py")
-
-    return [
-        (((f.replace(work_dir, "")).replace("/", "."))[:-3])
-        for f in mod_paths
-        if isfile(f) and f.endswith(".py") and not f.endswith("__init__.py")
-    ]
-
-
-ALL_MODULES = sorted(__list_all_modules())
-__all__ = ALL_MODULES + ["ALL_MODULES"]
+__all__ = ["ALL_MODULES"]
