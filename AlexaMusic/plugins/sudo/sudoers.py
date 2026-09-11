@@ -12,7 +12,7 @@ as you want or you can collabe if you have new ideas.
 from pyrogram import filters
 from pyrogram.types import Message
 
-from config import BANNED_USERS, MONGO_DB_URI, OWNER_ID, MUSIC_BOT_NAME
+from config import BANNED_USERS, OWNER_ID
 from strings import get_command
 from AlexaMusic import app
 from AlexaMusic.misc import SUDOERS
@@ -28,10 +28,6 @@ SUDOUSERS_COMMAND = get_command("SUDOUSERS_COMMAND")
 @app.on_message(filters.command(ADDSUDO_COMMAND) & filters.user(OWNER_ID))
 @language
 async def useradd(client, message: Message, _):
-    if MONGO_DB_URI is None:
-        return await message.reply_text(
-            "**ᴅᴜᴇ ᴛᴏ {MUSIC_BOT_NAME}'s ᴩʀɪᴠᴀᴄʏ ɪssᴜᴇs, ʏᴏᴜ ᴄᴀɴ'ᴛ ᴍᴀɴᴀɢᴇ sᴜᴅᴏ ᴜsᴇʀs ᴏɴ {MUSIC_BOT_NAME} ᴅᴀᴛᴀʙᴀsᴇ.\n\n ᴩʟᴇᴀsᴇ ᴀᴅᴅ ʏᴏᴜʀ ᴍᴏɴɢᴏ ᴅᴀᴛᴀʙᴀsᴇ ɪɴ ᴠᴀʀs ᴛᴏ ᴜsᴇ ᴛʜɪs ғᴇᴀᴛᴜʀᴇ.**"
-        )
     if not message.reply_to_message:
         if len(message.command) != 2:
             return await message.reply_text(_["auth_1"])
@@ -66,10 +62,6 @@ async def useradd(client, message: Message, _):
 @app.on_message(filters.command(DELSUDO_COMMAND) & filters.user(OWNER_ID))
 @language
 async def userdel(client, message: Message, _):
-    if MONGO_DB_URI is None:
-        return await message.reply_text(
-            "**ᴅᴜᴇ ᴛᴏ {MUSIC_BOT_NAME}'s ᴩʀɪᴠᴀᴄʏ ɪssᴜᴇs, ʏᴏᴜ ᴄᴀɴ'ᴛ ᴍᴀɴᴀɢᴇ sᴜᴅᴏ ᴜsᴇʀs ᴏɴ {MUSIC_BOT_NAME} ᴅᴀᴛᴀʙᴀsᴇ.\n\n ᴩʟᴇᴀsᴇ ᴀᴅᴅ ʏᴏᴜʀ ᴍᴏɴɢᴏ ᴅᴀᴛᴀʙᴀsᴇ ɪɴ ᴠᴀʀs ᴛᴏ ᴜsᴇ ᴛʜɪs ғᴇᴀᴛᴜʀᴇ.**"
-        )
     if not message.reply_to_message:
         if len(message.command) != 2:
             return await message.reply_text(_["auth_1"])
@@ -77,6 +69,8 @@ async def userdel(client, message: Message, _):
         if "@" in user:
             user = user.replace("@", "")
         user = await app.get_users(user)
+        if user.id == OWNER_ID:
+            return await message.reply_text("لا يمكن إزالة مالك البوت من قائمة Sudo.")
         if user.id not in SUDOERS:
             return await message.reply_text(_["sudo_3"])
         removed = await remove_sudo(user.id)
@@ -87,6 +81,8 @@ async def userdel(client, message: Message, _):
         await message.reply_text("Something wrong happened.")
         return
     user_id = message.reply_to_message.from_user.id
+    if user_id == OWNER_ID:
+        return await message.reply_text("لا يمكن إزالة مالك البوت من قائمة Sudo.")
     if user_id not in SUDOERS:
         return await message.reply_text(_["sudo_3"])
     removed = await remove_sudo(user_id)
@@ -107,7 +103,7 @@ async def sudoers_list(client, message: Message, _):
     count = 0
     smex = 0
     for user_id in SUDOERS:
-        if user_id not in OWNER_ID:
+        if user_id != OWNER_ID:
             try:
                 user = await app.get_users(user_id)
                 user = user.mention or user.first_name
