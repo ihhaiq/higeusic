@@ -5,8 +5,7 @@ RUN apt-get update -y && \
     build-essential \
     ffmpeg \
     unzip \
-    curl \
-    git && \
+    curl && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
     curl -fsSL https://deno.land/install.sh | sh
