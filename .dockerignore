@@ -1,10 +1,12 @@
 .env
 .cache
-Logs.txt
+logs.txt
 .DS_Store
 *.session
+*.session-journal
 raw_files/
 cache/
 downloads/
 __pycache__/
-*.session-journal
+data/database.json
+cookies/*.txt
