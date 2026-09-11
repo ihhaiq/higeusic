@@ -12,6 +12,8 @@ as you want or you can collabe if you have new ideas.
 import asyncio
 import sys
 
+import config
+
 from AlexaMusic.core.bot import AlexaBot
 from AlexaMusic.core.dir import dirr
 from AlexaMusic.core.git import git
