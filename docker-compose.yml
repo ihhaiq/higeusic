@@ -1,36 +1,16 @@
-version: "3.10"
 services:
   worker:
     build: .
     environment:
-      # Core bot configuration
-      BOT_TOKEN: $BOT_TOKEN
-      MUSIC_BOT_NAME: $MUSIC_BOT_NAME
-      OWNER_ID: $OWNER_ID
-      SUDO_USERS: $SUDO_USERS
-
-      # Database and session
-      MONGO_DB_URI: $MONGO_DB_URI
-      STRING_SESSION: $STRING_SESSION
-
-      # API credentials
-      API_ID: $API_ID
-      API_HASH: $API_HASH
-
-      # Heroku deployment (optional)
-      HEROKU_API_KEY: $HEROKU_API_KEY
-      HEROKU_APP_NAME: $HEROKU_APP_NAME
-
-      # Logging and support
-      LOG_GROUP_ID: $LOG_GROUP_ID
-      SUPPORT_GROUP: $SUPPORT_GROUP
-      SUPPORT_CHANNEL: $SUPPORT_CHANNEL
-
-      # Miscellaneous
-      AUTO_LEAVING_ASSISTANT: $AUTO_LEAVING_ASSISTANT
-      START_IMG_URL: $START_IMG_URL
-      UPSTREAM_REPO: $UPSTREAM_REPO
-      UPSTREAM_BRANCH: $UPSTREAM_BRANCH
-
-      # Cookies config
-      COOKIES: $COOKIES
+      API_ID: ${API_ID}
+      API_HASH: ${API_HASH}
+      BOT_TOKEN: ${BOT_TOKEN}
+      OWNER_ID: ${OWNER_ID}
+      LOG_GROUP_ID: ${LOG_GROUP_ID}
+      MUSIC_BOT_NAME: ${MUSIC_BOT_NAME}
+      MONGO_DB_URI: ${MONGO_DB_URI}
+      JSON_DB_PATH: ${JSON_DB_PATH:-data/database.json}
+      STRING_SESSION: ${STRING_SESSION}
+      COOKIES: ${COOKIES}
+      AUTO_LEAVING_ASSISTANT: ${AUTO_LEAVING_ASSISTANT:-False}
+      START_IMG_URL: ${START_IMG_URL:-assets/Ping.jpeg}
