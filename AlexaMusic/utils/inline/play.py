@@ -10,7 +10,6 @@ as you want or you can collabe if you have new ideas.
 """
 
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from config import SUPPORT_GROUP, SUPPORT_CHANNEL
 import random
 
 ## After Edits with Timer Bar
@@ -50,16 +49,13 @@ def stream_markup_timer(_, videoid, chat_id, played, dur):
                 text=_["PL_B_2"],
                 callback_data=f"add_playlist {videoid}",
             ),
-            InlineKeyboardButton(text="𝖮𝗐𝗇𝖾𝗋", url="https://t.me/Jankari_Ki_Duniya"),
         ],
         [
             InlineKeyboardButton(
                 text=_["PL_B_3"],
                 callback_data=f"PanelMarkup {videoid}|{chat_id}",
             ),
-            InlineKeyboardButton(text="𝖲𝗎𝗉𝗉𝗈𝗋𝗍 💬", url=SUPPORT_GROUP),
         ],
-        [InlineKeyboardButton(text="𝖴𝗉𝖽𝖺𝗍𝖾𝗌 📢", url=SUPPORT_CHANNEL)],
     ]
 
 
@@ -77,14 +73,12 @@ def telegram_markup_timer(_, videoid, chat_id, played, dur):
                 text=_["PL_B_2"],
                 callback_data=f"add_playlist {videoid}",
             ),
-            InlineKeyboardButton(text="𝖮𝗐𝗇𝖾𝗋", url="https://t.me/Jankari_Ki_Duniya"),
         ],
         [
             InlineKeyboardButton(
                 text=_["PL_B_3"],
                 callback_data=f"PanelMarkup None|{chat_id}",
             ),
-            InlineKeyboardButton(text="𝖲𝗎𝗉𝗉𝗈𝗋𝗍 💬", url=SUPPORT_GROUP),
         ],
     ]
 
@@ -99,14 +93,12 @@ def stream_markup(_, videoid, chat_id):
                 text=_["PL_B_2"],
                 callback_data=f"add_playlist {videoid}",
             ),
-            InlineKeyboardButton(text="𝖮𝗐𝗇𝖾𝗋", url="https://t.me/Jankari_Ki_Duniya"),
         ],
         [
             InlineKeyboardButton(
                 text=_["PL_B_3"],
                 callback_data=f"PanelMarkup None|{chat_id}",
             ),
-            InlineKeyboardButton(text="𝖲𝗎𝗉𝗉𝗈𝗋𝗍 💬", url=SUPPORT_GROUP),
         ],
     ]
 
@@ -166,10 +158,6 @@ def playlist_markup(_, videoid, user_id, ptype, channel, fplay):
         ],
         [
             InlineKeyboardButton(
-                text=_["S_B_3"],
-                url=f"{SUPPORT_GROUP}",
-            ),
-            InlineKeyboardButton(
                 text=_["CLOSE_BUTTON"],
                 callback_data=f"forceclose {videoid}|{user_id}",
             ),
@@ -189,10 +177,6 @@ def livestream_markup(_, videoid, user_id, mode, channel, fplay):
             ),
         ],
         [
-            InlineKeyboardButton(
-                text=_["S_B_3"],
-                url=f"{SUPPORT_GROUP}",
-            ),
             InlineKeyboardButton(
                 text=_["CLOSEMENU_BUTTON"],
                 callback_data=f"forceclose {videoid}|{user_id}",
@@ -252,10 +236,6 @@ def panel_markup_1(_, videoid, chat_id):
             InlineKeyboardButton(
                 text=_["PL_B_2"],
                 callback_data=f"add_playlist {videoid}",
-            ),
-            InlineKeyboardButton(
-                text=_["S_B_3"],
-                url=f"{SUPPORT_GROUP}",
             ),
         ],
         [
