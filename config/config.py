@@ -91,11 +91,19 @@ TG_VIDEO_FILESIZE_LIMIT = int(getenv("TG_VIDEO_FILESIZE_LIMIT", "1073741824"))
 COOKIES = getenv("COOKIES", None)
 # https://batbin.me
 
-STRING1 = getenv("STRING_SESSION", None)
-STRING2 = getenv("STRING_SESSION2", None)
-STRING3 = getenv("STRING_SESSION3", None)
-STRING4 = getenv("STRING_SESSION4", None)
-STRING5 = getenv("STRING_SESSION5", None)
+def _session_env(name: str):
+    value = getenv(name, None)
+    if not value:
+        return None
+    value = value.strip()
+    return value or None
+
+
+STRING1 = _session_env("STRING_SESSION")
+STRING2 = _session_env("STRING_SESSION2")
+STRING3 = _session_env("STRING_SESSION3")
+STRING4 = _session_env("STRING_SESSION4")
+STRING5 = _session_env("STRING_SESSION5")
 
 BANNED_USERS = filters.user()
 YTDOWNLOADER = 1
