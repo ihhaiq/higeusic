@@ -9,13 +9,10 @@ This program is free software: you can redistribute it and can modify
 as you want or you can collabe if you have new ideas.
 """
 
-import os
-from random import randint
-
 from pyrogram import filters
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message
 
-from AlexaMusic import Carbon, YouTube, app
+from AlexaMusic import Telegram, YouTube, app
 from AlexaMusic.utils.database import (
     delete_playlist,
     get_playlist,
@@ -28,7 +25,6 @@ from AlexaMusic.utils.inline.playlist import (
     get_playlist_markup,
     warning_markup,
 )
-from AlexaMusic.utils.pastebin import Alexabin
 from AlexaMusic.utils.stream.stream import stream
 from config import BANNED_USERS, SERVER_PLAYLIST_LIMIT
 from strings import get_command
@@ -56,12 +52,8 @@ async def check_playlist(client, message: Message, _):
         count += 1
         msg += f"\n\n{count}- {title[:70]}\n"
         msg += _["playlist_5"].format(duration)
-    link = await Alexabin(msg)
-    lines = msg.count("\n")
-    car = os.linesep.join(msg.split(os.linesep)[:17]) if lines >= 17 else msg
-    carbon = await Carbon.generate(car, randint(100, 10000000000))
     await get.delete()
-    await message.reply_photo(carbon, caption=_["playlist_15"].format(link))
+    await Telegram.send_split_text(message, msg)
 
 
 @app.on_message(filters.command(DELETEPLAYLIST_COMMAND) & filters.group & ~BANNED_USERS)
