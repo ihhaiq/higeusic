@@ -11,7 +11,6 @@ as you want or you can collabe if you have new ideas.
 
 import asyncio
 import os
-from random import randint
 
 from pyrogram import filters
 from pyrogram.errors import FloodWait
@@ -20,9 +19,9 @@ from pyrogram.types import CallbackQuery, InputMediaPhoto, Message
 import config
 from config import BANNED_USERS
 from strings import get_command
-from AlexaMusic import app
+from AlexaMusic import Telegram, app
 from AlexaMusic.misc import db
-from AlexaMusic.utils import Alexabin, get_channeplayCB, seconds_to_min
+from AlexaMusic.utils import get_channeplayCB, seconds_to_min
 from AlexaMusic.utils.database import get_cmode, is_active_chat, is_music_playing
 from AlexaMusic.utils.decorators.language import language, languageCB
 from AlexaMusic.utils.inline import queue_back_markup, queue_markup
@@ -179,23 +178,37 @@ async def queued_tracks(client, CallbackQuery: CallbackQuery, _):
     msg = ""
     for j, x in enumerate(got, start=1):
         if j == 1:
-            msg += f'ᴄᴜʀʀᴇɴᴛʟʏ ᴩʟᴀʏɪɴɢ:\n\n📌ᴛɪᴛʟᴇ: {x["title"]}\nᴅᴜʀᴀᴛɪᴏɴ: {x["dur"]}\nʙʏ: {x["by"]}\n\n'
+            msg += (
+                f'▶️ قيد التشغيل الآن:\n\n'
+                f'العنوان: {x["title"]}\n'
+                f'المدة: {x["dur"]}\n'
+                f'بواسطة: {x["by"]}\n\n'
+            )
         elif j == 2:
-            msg += f'ǫᴜᴇᴜᴇᴅ:\n\n📌ᴛɪᴛʟᴇ: {x["title"]}\nᴅᴜʀᴀᴛɪᴏɴ: {x["dur"]}\nʙʏ: {x["by"]}\n\n'
+            msg += (
+                f'📋 قائمة الانتظار:\n\n'
+                f'العنوان: {x["title"]}\n'
+                f'المدة: {x["dur"]}\n'
+                f'بواسطة: {x["by"]}\n\n'
+            )
         else:
-            msg += f'📌ᴛɪᴛʟᴇ: {x["title"]}\nᴅᴜʀᴀᴛɪᴏɴ: {x["dur"]}\nʙʏ: {x["by"]}\n\n'
-    if "Queued" in msg:
-        if len(msg) < 700:
-            await asyncio.sleep(1)
-            return await CallbackQuery.edit_message_text(msg, reply_markup=buttons)
-        if "📌" in msg:
-            msg = msg.replace("📌", "")
-        link = await Alexabin(msg)
-        med = InputMediaPhoto(media=link, caption=_["queue_3"].format(link))
-        await CallbackQuery.edit_message_media(media=med, reply_markup=buttons)
-    else:
-        await asyncio.sleep(1)
-        return await CallbackQuery.edit_message_text(msg, reply_markup=buttons)
+            msg += (
+                f'العنوان: {x["title"]}\n'
+                f'المدة: {x["dur"]}\n'
+                f'بواسطة: {x["by"]}\n\n'
+            )
+
+    if len(msg) <= 1024:
+        return await CallbackQuery.edit_message_caption(
+            caption=msg,
+            reply_markup=buttons,
+        )
+
+    await CallbackQuery.edit_message_caption(
+        caption="قائمة الانتظار طويلة؛ أرسلت التفاصيل في رسالة منفصلة.",
+        reply_markup=buttons,
+    )
+    return await Telegram.send_split_text(CallbackQuery.message, msg)
 
 
 @app.on_callback_query(filters.regex("queue_back_timer") & ~BANNED_USERS)
