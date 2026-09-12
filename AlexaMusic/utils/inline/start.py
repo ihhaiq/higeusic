@@ -40,24 +40,15 @@ def private_panel(_, BOT_USERNAME, OWNER: Union[bool, int] = None):
         ],
     ]
 
-    if GITHUB_REPO and OWNER_ID:
-        buttons.append(
-            [
-                InlineKeyboardButton(text=_["S_B_7"], user_id=OWNER_ID),
-                InlineKeyboardButton(text=_["S_B_6"], url=f"{GITHUB_REPO}"),
-            ]
+    extra_row = []
+    if OWNER:
+        extra_row.append(
+            InlineKeyboardButton(text=_["S_B_7"], user_id=OWNER)
         )
-    else:
-        if GITHUB_REPO:
-            buttons.append(
-                [
-                    InlineKeyboardButton(text=_["S_B_6"], url=f"{GITHUB_REPO}"),
-                ]
-            )
-        if OWNER:
-            buttons.append(
-                [
-                    InlineKeyboardButton(text=_["S_B_7"], user_id=OWNER_ID),
-                ]
-            )
+    if GITHUB_REPO:
+        extra_row.append(
+            InlineKeyboardButton(text=_["S_B_6"], url=f"{GITHUB_REPO}")
+        )
+    if extra_row:
+        buttons.append(extra_row)
     return buttons
