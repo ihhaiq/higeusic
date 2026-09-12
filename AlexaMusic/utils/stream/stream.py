@@ -249,15 +249,16 @@ async def stream(
                 "audio",
                 forceplay=forceplay,
             )
-            button = telegram_markup(_, chat_id)
-            run = await app.send_photo(
+            run = await send_stream_rich_message(
                 original_chat_id,
-                photo=config.SOUNCLOUD_IMG_URL,
-                caption=_["stream_3"].format(title, duration_min, user_name),
-                reply_markup=InlineKeyboardMarkup(button),
+                image=config.SOUNCLOUD_IMG_URL,
+                title=title,
+                is_video=False,
+                requester_id=user_id,
+                duration=duration_min,
             )
             db[chat_id][0]["mystic"] = run
-            db[chat_id][0]["markup"] = "tg"
+            db[chat_id][0]["markup"] = "rich"
     elif streamtype == "telegram":
         file_path = result["path"]
         link = result["link"]
