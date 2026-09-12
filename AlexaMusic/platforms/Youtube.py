@@ -23,6 +23,7 @@ from youtubesearchpython.__future__ import VideosSearch
 import config
 from AlexaMusic.utils.database import is_on_off
 from AlexaMusic.utils.formatters import seconds_to_min, time_to_seconds
+from AlexaMusic.logging import LOGGER
 
 
 def cookiefile():
@@ -327,22 +328,36 @@ class YouTubeAPI:
                 return xyz
 
         def video_dl():
+            os.makedirs("downloads", exist_ok=True)
             ydl_optssx = {
                 "cookiefile": cookiefile(),
-                "format": "bestvideo[ext=mp4][height<=1080]+bestaudio[ext=m4a]/best[ext=mp4][height<=1080]",
+                "format": (
+                    "bestvideo[ext=mp4][height<=720]+bestaudio[ext=m4a]/"
+                    "bestvideo[height<=720]+bestaudio/"
+                    "best[ext=mp4][height<=720]/best[height<=720]/best"
+                ),
                 "outtmpl": "downloads/%(id)s.%(ext)s",
+                "merge_output_format": "mp4",
                 "geo_bypass": True,
                 "nocheckcertificate": True,
                 "quiet": True,
                 "no_warnings": True,
             }
             with YoutubeDL(ydl_optssx) as x:
-                info = x.extract_info(link, False)
-                xyz = os.path.join("downloads", f"{info['id']}.{info['ext']}")
-                if os.path.exists(xyz):
-                    return xyz
-                x.download([link])
-                return xyz
+                info = x.extract_info(link, download=True)
+                video_id = str(info["id"])
+
+            preferred = os.path.join("downloads", f"{video_id}.mp4")
+            if os.path.isfile(preferred):
+                return preferred
+
+            for name in os.listdir("downloads"):
+                if name.startswith(f"{video_id}.") and not name.endswith((".part", ".ytdl")):
+                    candidate = os.path.join("downloads", name)
+                    if os.path.isfile(candidate):
+                        return candidate
+
+            raise RuntimeError("yt-dlp finished but no merged video file was found")
 
         def song_video_dl():
             formats = f"{format_id}+140"
@@ -392,7 +407,7 @@ class YouTubeAPI:
             fpath = f"downloads/{title}.mp3"
             return fpath
         elif video:
-            if await is_on_off(1):
+            if await is_on_off(config.YTDOWNLOADER):
                 direct = True
                 downloaded_file = await loop.run_in_executor(None, video_dl)
             else:
@@ -401,17 +416,22 @@ class YouTubeAPI:
                     *cookie_args(),
                     "-g",
                     "-f",
-                    "best[height<=?720][width<=?1280]",
+                    "best[ext=mp4][height<=720]/best[height<=720]/best",
                     f"{link}",
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                 )
                 stdout, stderr = await proc.communicate()
                 if stdout:
-                    downloaded_file = stdout.decode().split("\n")[0]
+                    downloaded_file = stdout.decode("utf-8", "replace").splitlines()[0]
                     direct = None
                 else:
-                    return
+                    LOGGER(__name__).warning(
+                        "Direct YouTube video URL unavailable; falling back to download/merge. %s",
+                        stderr.decode("utf-8", "replace").strip()[-800:],
+                    )
+                    direct = True
+                    downloaded_file = await loop.run_in_executor(None, video_dl)
         else:
             direct = True
             downloaded_file = await loop.run_in_executor(None, audio_dl)
