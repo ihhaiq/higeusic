@@ -365,20 +365,18 @@ class Call(PyTgCalls):
                     )
                 # theme = await check_theme(chat_id)
                 img = await gen_thumb(videoid)
-                button = telegram_markup(_, chat_id)
-                run = await app.send_photo(
+                requester_id = check[0].get("user_id") or config.OWNER_ID
+                run = await send_stream_rich_message(
                     original_chat_id,
-                    photo=img,
-                    caption=_["stream_1"].format(
-                        title[:27],
-                        f"https://t.me/{app.username}?start=info_{videoid}",
-                        check[0]["dur"],
-                        user,
-                    ),
-                    reply_markup=InlineKeyboardMarkup(button),
+                    image=img,
+                    title=title,
+                    is_video=str(streamtype) == "video",
+                    requester_id=requester_id,
+                    info_url=f"https://t.me/{app.username}?start=info_{videoid}",
+                    duration=check[0]["dur"],
                 )
                 db[chat_id][0]["mystic"] = run
-                db[chat_id][0]["markup"] = "tg"
+                db[chat_id][0]["markup"] = "rich"
             elif "vid_" in queued:
                 mystic = await app.send_message(original_chat_id, _["call_10"])
                 try:
