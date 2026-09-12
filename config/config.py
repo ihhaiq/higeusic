@@ -89,7 +89,7 @@ STRING4 = _session_env("STRING_SESSION4")
 STRING5 = _session_env("STRING_SESSION5")
 
 BANNED_USERS = filters.user()
-YTDOWNLOADER = 1
+YTDOWNLOADER = 3  # keep separate from maintenance (1) and logging (2)
 LOG = 2
 LOG_FILE_NAME = "logs.txt"
 adminlist = {}
