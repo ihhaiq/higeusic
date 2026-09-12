@@ -1,1 +1,67 @@
-python3 -m AlexaMusic
+#!/usr/bin/env bash
+set -u
+
+POT_HOME="/opt/bgutil-ytdlp-pot-provider/server"
+POT_PID=""
+BOT_PID=""
+
+cleanup() {
+    trap - EXIT INT TERM
+    if [ -n "${BOT_PID}" ] && kill -0 "${BOT_PID}" 2>/dev/null; then
+        kill "${BOT_PID}" 2>/dev/null || true
+    fi
+    if [ -n "${POT_PID}" ] && kill -0 "${POT_PID}" 2>/dev/null; then
+        kill "${POT_PID}" 2>/dev/null || true
+    fi
+    wait "${BOT_PID}" 2>/dev/null || true
+    wait "${POT_PID}" 2>/dev/null || true
+}
+
+trap cleanup EXIT INT TERM
+
+if [ -d "${POT_HOME}/node_modules" ]; then
+    (
+        cd "${POT_HOME}/node_modules" || exit 1
+        exec deno run \
+            --allow-env \
+            --allow-net \
+            --allow-ffi=. \
+            --allow-read=. \
+            ../src/main.ts \
+            --host 127.0.0.1 \
+            --port 4416
+    ) &
+    POT_PID=$!
+
+    POT_READY=0
+    for _ in $(seq 1 30); do
+        if curl -fsS http://127.0.0.1:4416/ping >/tmp/pot-provider.json 2>/dev/null; then
+            echo "[PO Token] bgutil provider is ready: $(cat /tmp/pot-provider.json)"
+            POT_READY=1
+            break
+        fi
+        if ! kill -0 "${POT_PID}" 2>/dev/null; then
+            echo "[PO Token] provider exited during startup; continuing with normal yt-dlp fallbacks." >&2
+            break
+        fi
+        sleep 0.5
+    done
+    if [ "${POT_READY}" -ne 1 ] && kill -0 "${POT_PID}" 2>/dev/null; then
+        echo "[PO Token] provider did not become ready in time; continuing with normal yt-dlp fallbacks." >&2
+    fi
+else
+    echo "[PO Token] provider files are missing; continuing without local PO token generation." >&2
+fi
+
+python3 -m AlexaMusic &
+BOT_PID=$!
+wait "${BOT_PID}"
+STATUS=$?
+
+trap - EXIT INT TERM
+if [ -n "${POT_PID}" ] && kill -0 "${POT_PID}" 2>/dev/null; then
+    kill "${POT_PID}" 2>/dev/null || true
+    wait "${POT_PID}" 2>/dev/null || true
+fi
+
+exit "${STATUS}"
