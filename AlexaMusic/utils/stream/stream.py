@@ -300,15 +300,17 @@ async def stream(
             )
             if video:
                 await add_active_video_chat(chat_id)
-            button = telegram_markup(_, chat_id)
-            run = await app.send_photo(
+            run = await send_stream_rich_message(
                 original_chat_id,
-                photo=config.TELEGRAM_VIDEO_URL if video else config.TELEGRAM_AUDIO_URL,
-                caption=_["stream_4"].format(title, link, duration_min, user_name),
-                reply_markup=InlineKeyboardMarkup(button),
+                image=config.TELEGRAM_VIDEO_URL if video else config.TELEGRAM_AUDIO_URL,
+                title=title,
+                is_video=bool(video),
+                requester_id=user_id,
+                info_url=link,
+                duration=duration_min,
             )
             db[chat_id][0]["mystic"] = run
-            db[chat_id][0]["markup"] = "tg"
+            db[chat_id][0]["markup"] = "rich"
     elif streamtype == "live":
         link = result["link"]
         vidid = result["vidid"]
