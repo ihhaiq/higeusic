@@ -16,6 +16,7 @@ spotipy
 unidecode
 uvloop==0.21.0
 yt-dlp[default]>=2026.3.17
+bgutil-ytdlp-pot-provider==2.0.0
 Kurigram==2.2.24
 https://github.com/KSKOP69/youtube-search-python/archive/78ee7d704e42d214f9aef17726076f64a5044f10.zip
 PyYAML~=6.0.3
