@@ -34,19 +34,19 @@ async def send_stream_rich_message(
     info_url: str | None = None,
     duration: str | None = None,
 ):
-    label = "🎬 عنوان الفيديو" if is_video else "🎵 عنوان المقطع"
+    label = "عنوان الفيديو" if is_video else "عنوان المقطع"
     blocks: list[dict[str, Any]] = [
         {"type": "heading", "text": "📡 بدأ البث 💡", "size": 1},
         {"type": "divider"},
         {"type": "photo", "photo": InputMediaPhoto(media=_media(image), parse_mode=None)},
         {"type": "divider"},
         {"type": "footer", "text": f"{label}: {title}"},
-        {"type": "footer", "text": _button("🎛 قائمة التحكم", callback_data=f"RICHCTRL {chat_id}|{requester_id}", style="primary")},
+        {"type": "footer", "text": _button("قائمة التحكم", callback_data=f"RICHCTRL {chat_id}|{requester_id}", style="primary")},
     ]
     if info_url:
-        blocks.append({"type": "footer", "text": {"type": "url", "text": "🔦 معلومات أكثر", "url": info_url}})
+        blocks.append({"type": "footer", "text": {"type": "url", "text": "معلومات أكثر", "url": info_url}})
     else:
-        text = "🔦 معلومات أكثر"
+        text = "معلومات أكثر"
         if duration:
             text += f" • المدة: {duration}"
         blocks.append({"type": "footer", "text": text})
