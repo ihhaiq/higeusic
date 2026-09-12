@@ -59,6 +59,199 @@ async def _can_use_rich_controls(chat_id: int, user_id: int, requester_id: int) 
         return False
 
 
+async def _handle_rich_control_action(
+    CallbackQuery: CallbackQuery,
+    _,
+    command: str,
+    chat_id: int,
+):
+    if command == "Pause":
+        if not await is_music_playing(chat_id):
+            return await CallbackQuery.answer(_["admin_1"], show_alert=True)
+        await music_off(chat_id)
+        await Alexa.pause_stream(chat_id)
+        return await CallbackQuery.answer("⏸ تم إيقاف التشغيل مؤقتاً.")
+
+    if command == "Resume":
+        if await is_music_playing(chat_id):
+            return await CallbackQuery.answer(_["admin_3"], show_alert=True)
+        await music_on(chat_id)
+        await Alexa.resume_stream(chat_id)
+        return await CallbackQuery.answer("▶️ تم استئناف التشغيل.")
+
+    if command in {"Stop", "End"}:
+        await Alexa.stop_stream(chat_id)
+        await set_loop(chat_id, 0)
+        return await CallbackQuery.answer("⏹ تم إنهاء التشغيل.")
+
+    if command == "Mute":
+        if await is_muted(chat_id):
+            return await CallbackQuery.answer(_["admin_5"], show_alert=True)
+        await mute_on(chat_id)
+        await Alexa.mute_stream(chat_id)
+        return await CallbackQuery.answer("🔇 تم كتم الصوت.")
+
+    if command == "Unmute":
+        if not await is_muted(chat_id):
+            return await CallbackQuery.answer(_["admin_7"], show_alert=True)
+        await mute_off(chat_id)
+        await Alexa.unmute_stream(chat_id)
+        return await CallbackQuery.answer("🔊 تم إلغاء كتم الصوت.")
+
+    if command == "Loop":
+        await set_loop(chat_id, 3)
+        return await CallbackQuery.answer("🔁 تم تكرار المقطع 3 مرات.")
+
+    if command == "Shuffle":
+        check = db.get(chat_id)
+        if not check or len(check) < 2:
+            return await CallbackQuery.answer(_["admin_21"], show_alert=True)
+        current = check.pop(0)
+        random.shuffle(check)
+        check.insert(0, current)
+        return await CallbackQuery.answer("🔀 تم خلط قائمة الانتظار.")
+
+    if command == "Skip":
+        check = db.get(chat_id)
+        if not check:
+            return await CallbackQuery.answer(_["queue_2"], show_alert=True)
+
+        try:
+            popped = check.pop(0)
+            if AUTO_DOWNLOADS_CLEAR == str(True):
+                await auto_clean(popped)
+        except Exception:
+            return await CallbackQuery.answer(_["admin_22"], show_alert=True)
+
+        if not check:
+            try:
+                await Alexa.stop_stream(chat_id)
+            finally:
+                await set_loop(chat_id, 0)
+            return await CallbackQuery.answer("⏹ انتهت قائمة الانتظار.")
+
+        item = check[0]
+        queued = item["file"]
+        title = (item["title"]).title()
+        streamtype = item["streamtype"]
+        videoid = item["vidid"]
+        duration_min = item["dur"]
+        requester_id = item.get("user_id") or CallbackQuery.from_user.id
+        original_chat_id = item.get("chat_id") or chat_id
+        is_video = str(streamtype) == "video"
+        status = True if is_video else None
+        db[chat_id][0]["played"] = 0
+
+        try:
+            if "live_" in queued:
+                n, source = await YouTube.video(videoid, True)
+                if n == 0:
+                    return await CallbackQuery.answer(_["admin_11"].format(title), show_alert=True)
+                await Alexa.skip_stream(chat_id, source, video=status)
+                image = await gen_thumb(videoid)
+                info_url = f"https://t.me/{app.username}?start=info_{videoid}"
+            elif "vid_" in queued:
+                source, _direct = await YouTube.download(
+                    videoid,
+                    None,
+                    videoid=True,
+                    video=status,
+                )
+                await Alexa.skip_stream(chat_id, source, video=status)
+                image = await gen_thumb(videoid)
+                info_url = f"https://t.me/{app.username}?start=info_{videoid}"
+            elif "index_" in queued:
+                await Alexa.skip_stream(chat_id, videoid, video=status)
+                image = STREAM_IMG_URL
+                title = "بث مباشر من رابط"
+                info_url = None
+            else:
+                await Alexa.skip_stream(chat_id, queued, video=status)
+                if videoid == "telegram":
+                    image = TELEGRAM_VIDEO_URL if is_video else TELEGRAM_AUDIO_URL
+                    info_url = None
+                elif videoid == "soundcloud":
+                    image = TELEGRAM_VIDEO_URL if is_video else SOUNCLOUD_IMG_URL
+                    info_url = None
+                else:
+                    image = await gen_thumb(videoid)
+                    info_url = f"https://t.me/{app.username}?start=info_{videoid}"
+        except Exception:
+            return await CallbackQuery.answer(_["call_9"], show_alert=True)
+
+        run = await send_stream_rich_message(
+            original_chat_id,
+            image=image,
+            title=title,
+            is_video=is_video,
+            requester_id=requester_id,
+            info_url=info_url,
+            duration=duration_min,
+        )
+        db[chat_id][0]["mystic"] = run
+        db[chat_id][0]["markup"] = "rich"
+        return await CallbackQuery.answer("⏭ تم تخطي المقطع.")
+
+    if command in {"1", "2", "3", "4"}:
+        playing = db.get(chat_id)
+        if not playing:
+            return await CallbackQuery.answer(_["queue_2"], show_alert=True)
+
+        duration_seconds = int(playing[0]["seconds"])
+        if duration_seconds == 0:
+            return await CallbackQuery.answer(_["admin_30"], show_alert=True)
+
+        file_path = playing[0]["file"]
+        if "index_" in file_path or "live_" in file_path:
+            return await CallbackQuery.answer(_["admin_30"], show_alert=True)
+
+        duration_played = int(playing[0]["played"])
+        duration_to_skip = 10 if command in {"1", "2"} else 30
+        duration = playing[0]["dur"]
+
+        if command in {"1", "3"}:
+            if duration_played - duration_to_skip <= 10:
+                return await CallbackQuery.answer(
+                    "لا يمكن الرجوع أكثر في هذا المقطع.",
+                    show_alert=True,
+                )
+            to_seek = duration_played - duration_to_skip + 1
+        else:
+            if duration_seconds - (duration_played + duration_to_skip) <= 10:
+                return await CallbackQuery.answer(
+                    "لا يمكن التقدم أكثر في هذا المقطع.",
+                    show_alert=True,
+                )
+            to_seek = duration_played + duration_to_skip + 1
+
+        if "vid_" in file_path:
+            n, file_path = await YouTube.video(playing[0]["vidid"], True)
+            if n == 0:
+                return await CallbackQuery.answer(_["admin_30"], show_alert=True)
+
+        try:
+            await Alexa.seek_stream(
+                chat_id,
+                file_path,
+                seconds_to_min(to_seek),
+                duration,
+                playing[0]["streamtype"],
+            )
+        except Exception:
+            return await CallbackQuery.answer(_["admin_34"], show_alert=True)
+
+        if command in {"1", "3"}:
+            db[chat_id][0]["played"] -= duration_to_skip
+        else:
+            db[chat_id][0]["played"] += duration_to_skip
+
+        return await CallbackQuery.answer(
+            f"⏱ تم الانتقال إلى {seconds_to_min(to_seek)}."
+        )
+
+    return await CallbackQuery.answer("أمر تحكم غير معروف.", show_alert=True)
+
+
 @app.on_callback_query(filters.regex(r"^RICHCTRL ") & ~BANNED_USERS)
 @languageCB
 async def rich_control_panel(client, CallbackQuery: CallbackQuery, _):
