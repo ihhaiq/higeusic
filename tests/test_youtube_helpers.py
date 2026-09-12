@@ -1,5 +1,6 @@
 import importlib.util
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -40,36 +41,95 @@ class YouTubeHelpersTest(unittest.TestCase):
             "ytsearch10:video title",
         )
 
+    def test_player_client_parsing_preserves_valid_order(self):
+        self.assertEqual(
+            helpers.parse_player_clients(" mweb, web_safari, tv, web "),
+            ("mweb", "web_safari", "tv", "web"),
+        )
+
+    def test_player_client_parsing_ignores_duplicates_and_invalid_values(self):
+        self.assertEqual(
+            helpers.parse_player_clients("mweb, mweb,invalid,tv, tv"),
+            ("mweb", "tv"),
+        )
+
+    def test_player_client_parsing_falls_back_to_mweb(self):
+        for value in ("", "invalid, nope", None, 123):
+            with self.subTest(value=value):
+                self.assertEqual(helpers.parse_player_clients(value), ("mweb",))
+
     def test_auth_attempt_order_with_cookies(self):
-        attempts = helpers.build_attempts(pot_enabled=True, has_cookies=True)
-        self.assertEqual(
-            [attempt.strategy.value for attempt in attempts],
-            ["po_token", "cookies", "anonymous"],
+        attempts = helpers.build_attempts(
+            pot_enabled=True,
+            has_cookies=True,
+            player_clients="mweb,web_safari,tv,web",
         )
-        self.assertTrue(attempts[0].use_cookies)
-        self.assertFalse(attempts[1].use_plugins)
-        self.assertFalse(attempts[2].use_plugins)
+        self.assertEqual(
+            [(attempt.strategy.value, attempt.player_client) for attempt in attempts],
+            [
+                ("po_token", "mweb"),
+                ("po_token", "web_safari"),
+                ("po_token", "tv"),
+                ("po_token", "web"),
+                ("cookies", None),
+                ("anonymous", None),
+            ],
+        )
+        self.assertFalse(any(attempt.use_cookies for attempt in attempts[:4]))
+        self.assertTrue(attempts[4].use_cookies)
+        self.assertFalse(attempts[-1].use_plugins)
 
-    def test_auth_attempt_order_without_cookies(self):
-        attempts = helpers.build_attempts(pot_enabled=True, has_cookies=False)
-        self.assertEqual(
-            [attempt.strategy.value for attempt in attempts],
-            ["po_token", "anonymous"],
+    def test_po_token_attempts_include_client_name(self):
+        attempts = helpers.build_attempts(
+            pot_enabled=True,
+            has_cookies=False,
+            player_clients="mweb,web",
         )
-        self.assertFalse(attempts[0].use_cookies)
-
-    def test_anonymous_is_always_available(self):
-        attempts = helpers.build_attempts(pot_enabled=False, has_cookies=False)
         self.assertEqual(
-            [attempt.strategy.value for attempt in attempts], ["anonymous"]
+            [attempt.player_client for attempt in attempts[:-1]],
+            ["mweb", "web"],
         )
 
-    def test_cookies_precede_anonymous_when_pot_is_disabled(self):
-        attempts = helpers.build_attempts(pot_enabled=False, has_cookies=True)
-        self.assertEqual(
-            [attempt.strategy.value for attempt in attempts],
-            ["cookies", "anonymous"],
+    def test_cookie_attempt_depends_on_cookie_file_existence(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "cookies.txt"
+            attempts = helpers.build_attempts(
+                pot_enabled=False,
+                has_cookies=helpers.cookie_file_available(path),
+            )
+            self.assertEqual(
+                [attempt.strategy.value for attempt in attempts],
+                ["anonymous"],
+            )
+
+            path.write_text(
+                "# Netscape HTTP Cookie File\n.youtube.com\tTRUE\t/\tTRUE\t0\tSID\tvalue\n",
+                encoding="utf-8",
+            )
+            attempts = helpers.build_attempts(
+                pot_enabled=False,
+                has_cookies=helpers.cookie_file_available(path),
+            )
+            self.assertEqual(
+                [attempt.strategy.value for attempt in attempts],
+                ["cookies", "anonymous"],
+            )
+
+    def test_anonymous_is_always_last(self):
+        combinations = (
+            (True, True),
+            (True, False),
+            (False, True),
+            (False, False),
         )
+        for pot_enabled, has_cookies in combinations:
+            with self.subTest(pot_enabled=pot_enabled, has_cookies=has_cookies):
+                attempts = helpers.build_attempts(
+                    pot_enabled=pot_enabled,
+                    has_cookies=has_cookies,
+                    player_clients="mweb,web_safari,tv,web",
+                )
+                self.assertEqual(attempts[-1].strategy.value, "anonymous")
 
     def test_duration_conversion(self):
         self.assertEqual(helpers.duration_to_seconds("01:02:03"), 3723)
@@ -88,6 +148,13 @@ class YouTubeHelpersTest(unittest.TestCase):
         for message, expected in cases.items():
             with self.subTest(message=message):
                 self.assertEqual(helpers.classify_youtube_error(message), expected)
+
+    def test_cookie_rejection_user_message_is_safe_and_practical(self):
+        message = helpers.friendly_youtube_error(
+            "Sign in to confirm you're not a bot: very long yt-dlp details"
+        )
+        self.assertIn("Cookies صالحة", message)
+        self.assertNotIn("yt-dlp details", message)
 
 
 if __name__ == "__main__":

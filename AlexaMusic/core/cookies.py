@@ -8,92 +8,95 @@ import aiofiles
 import config
 from ..logging import LOGGER
 
+DEFAULT_COOKIES_FILE = "cookies/cookies.txt"
 
-async def save_file(content: str, file_path: str):
+
+def cookies_path() -> str:
+    value = getattr(config, "YOUTUBE_COOKIES_FILE", DEFAULT_COOKIES_FILE)
     try:
-        os.makedirs(os.path.dirname(file_path), exist_ok=True)
-        async with aiofiles.open(file_path, "w", encoding="utf-8") as file:
-            await file.write(content)
-        return file_path
-    except Exception as e:
-        LOGGER(__name__).error(f"Error saving file {file_path}: {e}")
-        return ""
+        path = os.fspath(value).strip()
+    except (TypeError, ValueError):
+        path = ""
+    return path or DEFAULT_COOKIES_FILE
 
 
-async def save_cookies():
-    content = config.COOKIES
+def _normalize_cookies(content: object) -> str:
+    text = str(content or "").replace("\r\n", "\n").replace("\r", "\n").strip()
+    if len(text) >= 2 and text[0] == text[-1] and text[0] in {'"', "'"}:
+        text = text[1:-1].strip()
+    if text and not text.endswith("\n"):
+        text += "\n"
+    return text
 
-    if not content:
-        LOGGER(__name__).warning(
-            "COOKIES is not configured. Continuing without YouTube cookies."
-        )
-        return
 
-    content = str(content).replace("\r\n", "\n").replace("\r", "\n").strip()
+def cookies_format_looks_valid(content: str) -> bool:
+    lines = content.splitlines()
+    if not lines:
+        return False
+    first_line = lines[0].lstrip("\ufeff")
+    if first_line not in {"# Netscape HTTP Cookie File", "# HTTP Cookie File"}:
+        return False
 
-    # Railway users sometimes paste the entire value wrapped in quotes.
-    if len(content) >= 2 and content[0] == content[-1] and content[0] in {'"', "'"}:
-        content = content[1:-1].strip()
-
-    if content and not content.endswith("\n"):
-        content += "\n"
-
-    first_line = content.splitlines()[0].lstrip("\ufeff") if content else ""
-    valid_header = first_line in {"# Netscape HTTP Cookie File", "# HTTP Cookie File"}
-
-    cookie_names = set()
-    youtube_rows = 0
-    for raw_line in content.splitlines():
+    for raw_line in lines:
         line = raw_line.strip()
         if not line or line.startswith("#"):
             continue
         parts = line.split("\t")
-        if len(parts) >= 7:
-            domain = parts[0].lstrip(".").lower()
-            if domain.endswith("youtube.com") or domain.endswith("google.com"):
-                youtube_rows += 1
-                cookie_names.add(parts[5])
+        if len(parts) < 7:
+            continue
+        domain = parts[0].lstrip(".").lower()
+        if domain.endswith("youtube.com") or domain.endswith("google.com"):
+            return True
+    return False
 
-    auth_names = {
-        "SID",
-        "HSID",
-        "SSID",
-        "APISID",
-        "SAPISID",
-        "__Secure-1PAPISID",
-        "__Secure-3PAPISID",
-        "__Secure-1PSID",
-        "__Secure-3PSID",
-        "LOGIN_INFO",
-    }
-    auth_count = len(cookie_names & auth_names)
 
-    if not valid_header:
-        LOGGER(__name__).warning(
-            "COOKIES does not start with a valid Netscape cookie header. "
-            "yt-dlp may ignore or reject it."
-        )
-    elif youtube_rows == 0:
-        LOGGER(__name__).warning(
-            "COOKIES has a Netscape header but contains no YouTube/Google cookie rows."
-        )
-    elif auth_count == 0:
-        LOGGER(__name__).warning(
-            "COOKIES contains YouTube/Google rows but no recognizable signed-in "
-            "account cookies. Export cookies while logged in to YouTube."
-        )
+def cookies_file_status() -> str:
+    path = cookies_path()
+    try:
+        if not os.path.isfile(path) or os.path.getsize(path) <= 0:
+            return "missing"
+        with open(path, "r", encoding="utf-8", errors="replace") as file:
+            content = file.read()
+    except OSError:
+        return "missing"
+    return "valid" if cookies_format_looks_valid(content) else "invalid"
+
+
+async def save_file(content: str, file_path: str) -> str:
+    try:
+        directory = os.path.dirname(file_path)
+        if directory:
+            os.makedirs(directory, exist_ok=True)
+        async with aiofiles.open(file_path, "w", encoding="utf-8") as file:
+            await file.write(content)
+        return file_path
+    except OSError:
+        return ""
+
+
+async def save_cookies():
+    path = cookies_path()
+    env_content = getattr(config, "COOKIES", None)
+
+    if env_content:
+        content = _normalize_cookies(env_content)
+        saved_path = await save_file(content, path)
+        if not saved_path:
+            LOGGER(__name__).warning("Cookies missing")
+            return
     else:
-        LOGGER(__name__).info(
-            f"Cookie format check passed: {youtube_rows} YouTube/Google rows, "
-            f"{auth_count} authentication-cookie names detected."
-        )
+        try:
+            if not os.path.isfile(path) or os.path.getsize(path) <= 0:
+                LOGGER(__name__).warning("Cookies missing")
+                return
+            async with aiofiles.open(path, "r", encoding="utf-8", errors="replace") as file:
+                content = await file.read()
+        except OSError:
+            LOGGER(__name__).warning("Cookies missing")
+            return
 
-    file_path = "cookies/cookies.txt"
-    saved_path = await save_file(content, file_path)
-
-    if saved_path and os.path.getsize(saved_path) > 0:
-        LOGGER(__name__).info(f"Cookies saved successfully to {saved_path}.")
+    LOGGER(__name__).info("Cookies file found")
+    if cookies_format_looks_valid(content):
+        LOGGER(__name__).info("Cookies format looks valid")
     else:
-        LOGGER(__name__).warning(
-            "Failed to save cookies. Continuing without YouTube cookies."
-        )
+        LOGGER(__name__).warning("Cookies appear expired/rejected")
