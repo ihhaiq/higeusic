@@ -19,3 +19,5 @@ yt-dlp[default]>=2026.3.17
 Kurigram==2.2.24
 https://github.com/KSKOP69/youtube-search-python/archive/78ee7d704e42d214f9aef17726076f64a5044f10.zip
 PyYAML~=6.0.3
+
+aiogram @ https://github.com/aiogram/aiogram/archive/52889dbd34608bc1cc307279c2a955575fc77ba5.zip
