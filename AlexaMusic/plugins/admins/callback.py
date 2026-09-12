@@ -365,47 +365,49 @@ async def del_back_playlist(client, CallbackQuery, _):
             except Exception:
                 return await CallbackQuery.message.reply_text(_["call_9"])
             if videoid == "telegram":
-                button = telegram_markup(_, chat_id)
-                run = await CallbackQuery.message.reply_photo(
-                    photo=(
+                run = await send_stream_rich_message(
+                    original_chat_id,
+                    image=(
                         TELEGRAM_AUDIO_URL
                         if str(streamtype) == "audio"
                         else TELEGRAM_VIDEO_URL
                     ),
-                    caption=_["stream_3"].format(title, check[0]["dur"], user),
-                    reply_markup=InlineKeyboardMarkup(button),
+                    title=title,
+                    is_video=str(streamtype) == "video",
+                    requester_id=requester_id,
+                    duration=check[0]["dur"],
                 )
                 db[chat_id][0]["mystic"] = run
-                db[chat_id][0]["markup"] = "tg"
+                db[chat_id][0]["markup"] = "rich"
             elif videoid == "soundcloud":
-                button = telegram_markup(_, chat_id)
-                run = await CallbackQuery.message.reply_photo(
-                    photo=(
+                run = await send_stream_rich_message(
+                    original_chat_id,
+                    image=(
                         SOUNCLOUD_IMG_URL
                         if str(streamtype) == "audio"
                         else TELEGRAM_VIDEO_URL
                     ),
-                    caption=_["stream_3"].format(title, check[0]["dur"], user),
-                    reply_markup=InlineKeyboardMarkup(button),
+                    title=title,
+                    is_video=str(streamtype) == "video",
+                    requester_id=requester_id,
+                    duration=check[0]["dur"],
                 )
                 db[chat_id][0]["mystic"] = run
-                db[chat_id][0]["markup"] = "tg"
+                db[chat_id][0]["markup"] = "rich"
             else:
                 # theme = await check_theme(chat_id)
-                button = stream_markup(_, videoid, chat_id)
                 img = await gen_thumb(videoid)
-                run = await CallbackQuery.message.reply_photo(
-                    photo=img,
-                    caption=_["stream_1"].format(
-                        title[:27],
-                        f"https://t.me/{app.username}?start=info_{videoid}",
-                        duration_min,
-                        user,
-                    ),
-                    reply_markup=InlineKeyboardMarkup(button),
+                run = await send_stream_rich_message(
+                    original_chat_id,
+                    image=img,
+                    title=title,
+                    is_video=str(streamtype) == "video",
+                    requester_id=requester_id,
+                    info_url=f"https://t.me/{app.username}?start=info_{videoid}",
+                    duration=duration_min,
                 )
                 db[chat_id][0]["mystic"] = run
-                db[chat_id][0]["markup"] = "stream"
+                db[chat_id][0]["markup"] = "rich"
             await CallbackQuery.edit_message_text(txt)
     else:
         playing = db.get(chat_id)
