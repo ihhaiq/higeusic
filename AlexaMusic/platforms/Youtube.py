@@ -13,6 +13,7 @@ import asyncio
 import os
 import re
 import json
+import shlex
 from typing import Union
 
 from yt_dlp import YoutubeDL
@@ -105,41 +106,13 @@ class YouTubeAPI:
     async def details(self, link: str, videoid: Union[bool, str] = None):
         if videoid:
             link = self.base + link
-
-        # A direct YouTube URL must never be passed to VideosSearch as a text
-        # query. With tracking parameters (e.g. youtu.be/<id>?si=...) the
-        # search API can return a completely different video.
-        if await self.exists(link):
-            info = await _yt_dlp_info(link)
-            title = info.get("title") or "Unknown title"
-            duration_sec = int(info.get("duration") or 0)
-            duration_min = seconds_to_min(duration_sec) if duration_sec else None
-            thumbnail = info.get("thumbnail") or config.YOUTUBE_IMG_URL
-            vidid = info["id"]
-            return title, duration_min, duration_sec, thumbnail, vidid
-
-        if "&" in link:
-            link = link.split("&")[0]
-        try:
-            results = VideosSearch(link, limit=1)
-            items = (await results.next()).get("result") or []
-            if not items:
-                raise RuntimeError("youtube-search-python returned no results")
-            result = items[0]
-            title = result["title"]
-            duration_min = result["duration"]
-            thumbnail = result["thumbnails"][0]["url"].split("?")[0]
-            vidid = result["id"]
-            duration_sec = 0 if str(duration_min) == "None" else int(time_to_seconds(duration_min))
-            return title, duration_min, duration_sec, thumbnail, vidid
-        except Exception:
-            info = await _yt_dlp_info(link)
-            title = info.get("title") or "Unknown title"
-            duration_sec = int(info.get("duration") or 0)
-            duration_min = seconds_to_min(duration_sec) if duration_sec else None
-            thumbnail = info.get("thumbnail") or config.YOUTUBE_IMG_URL
-            vidid = info["id"]
-            return title, duration_min, duration_sec, thumbnail, vidid
+        info = await _yt_dlp_info(link)
+        title = info.get("title") or "Unknown title"
+        duration_sec = int(info.get("duration") or 0)
+        duration_min = seconds_to_min(duration_sec) if duration_sec else None
+        thumbnail = info.get("thumbnail") or config.YOUTUBE_IMG_URL
+        vidid = info["id"]
+        return title, duration_min, duration_sec, thumbnail, vidid
 
     async def title(self, link: str, videoid: Union[bool, str] = None):
         if videoid:
@@ -220,39 +193,16 @@ class YouTubeAPI:
         if videoid:
             link = self.base + link
 
-        # Resolve direct URLs by their actual video id instead of treating the
-        # URL as search text. This is especially important for youtu.be links
-        # containing ?si= tracking parameters.
-        if await self.exists(link):
-            info = await _yt_dlp_info(link)
-            title = info.get("title") or "Unknown title"
-            duration = int(info.get("duration") or 0)
-            duration_min = seconds_to_min(duration) if duration else None
-            vidid = info["id"]
-            yturl = info.get("webpage_url") or f"{self.base}{vidid}"
-            thumbnail = info.get("thumbnail") or config.YOUTUBE_IMG_URL
-        else:
-            if "&" in link:
-                link = link.split("&")[0]
-            try:
-                results = VideosSearch(link, limit=1)
-                items = (await results.next()).get("result") or []
-                if not items:
-                    raise RuntimeError("youtube-search-python returned no results")
-                result = items[0]
-                title = result["title"]
-                duration_min = result["duration"]
-                vidid = result["id"]
-                yturl = result["link"]
-                thumbnail = result["thumbnails"][0]["url"].split("?")[0]
-            except Exception:
-                info = await _yt_dlp_info(link)
-                title = info.get("title") or "Unknown title"
-                duration = int(info.get("duration") or 0)
-                duration_min = seconds_to_min(duration) if duration else None
-                vidid = info["id"]
-                yturl = info.get("webpage_url") or f"{self.base}{vidid}"
-                thumbnail = info.get("thumbnail") or config.YOUTUBE_IMG_URL
+        # Use yt-dlp for both direct URLs and text searches. This avoids
+        # youtube-search-python parser breakages and guarantees that a direct
+        # URL resolves to its exact video id.
+        info = await _yt_dlp_info(link)
+        title = info.get("title") or "Unknown title"
+        duration = int(info.get("duration") or 0)
+        duration_min = seconds_to_min(duration) if duration else None
+        vidid = info["id"]
+        yturl = info.get("webpage_url") or f"{self.base}{vidid}"
+        thumbnail = info.get("thumbnail") or config.YOUTUBE_IMG_URL
 
         track_details = {
             "title": title,
@@ -263,6 +213,29 @@ class YouTubeAPI:
             "cookiefile": cookiefile(),
         }
         return track_details, vidid
+
+    def ytdlp_parameters(self) -> str:
+        params = ["--no-playlist", "--no-warnings"]
+        path = cookiefile()
+        if path:
+            params.extend(["--cookies", path])
+        return " ".join(shlex.quote(part) for part in params)
+
+    def friendly_error(self, error: Exception) -> str:
+        text = str(error).lower()
+        if "sign in to confirm you’re not a bot" in text or "sign in to confirm you're not a bot" in text:
+            return (
+                "رفض YouTube جلسة الكوكيز الحالية وطلب تسجيل دخول للتحقق. "
+                "حدّث COOKIES بجلسة YouTube جديدة ثم حاول مرة أخرى."
+            )
+        if "sign in to confirm your age" in text or "age-restricted" in text:
+            return (
+                "هذا الفيديو مقيّد بالعمر، والكوكيز الحالية لا تسمح لـ YouTube "
+                "بالتحقق من العمر. استخدم كوكيز حساب مسجل ومسموح له بمشاهدة الفيديو."
+            )
+        if "video unavailable" in text or "private video" in text:
+            return "فيديو YouTube غير متاح أو خاص ولا يمكن تشغيله."
+        return "تعذر جلب أو تجهيز فيديو YouTube حالياً. حاول مرة أخرى بعد قليل."
 
     async def formats(self, link: str, videoid: Union[bool, str] = None):
         if videoid:
