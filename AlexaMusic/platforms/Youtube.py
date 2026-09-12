@@ -22,7 +22,7 @@ from youtubesearchpython.__future__ import VideosSearch
 
 import config
 from AlexaMusic.utils.database import is_on_off
-from AlexaMusic.utils.formatters import time_to_seconds
+from AlexaMusic.utils.formatters import seconds_to_min, time_to_seconds
 
 
 def cookiefile():
@@ -38,6 +38,37 @@ def cookiefile():
 def cookie_args():
     path = cookiefile()
     return ["--cookies", path] if path else []
+
+
+async def _yt_dlp_info(query: str):
+    """Fetch one YouTube result with yt-dlp.
+
+    Plain text is searched with ytsearch1; YouTube URLs are read directly.
+    This avoids relying exclusively on youtube-search-python, which can break
+    when YouTube changes its internal response format.
+    """
+    source = query if re.search(r"(?:youtube\.com|youtu\.be)", query) else f"ytsearch1:{query}"
+
+    def extract():
+        opts = {
+            "quiet": True,
+            "no_warnings": True,
+            "skip_download": True,
+            "noplaylist": True,
+            "cookiefile": cookiefile(),
+        }
+        with YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(source, download=False)
+            if isinstance(info, dict) and info.get("entries") is not None:
+                entries = [item for item in (info.get("entries") or []) if item]
+                if not entries:
+                    raise RuntimeError("YouTube search returned no results")
+                info = entries[0]
+            if not isinstance(info, dict) or not info.get("id"):
+                raise RuntimeError("YouTube metadata is unavailable")
+            return info
+
+    return await asyncio.to_thread(extract)
 
 
 class YouTubeAPI:
@@ -80,17 +111,26 @@ class YouTubeAPI:
             link = self.base + link
         if "&" in link:
             link = link.split("&")[0]
-        results = VideosSearch(link, limit=1)
-        for result in (await results.next())["result"]:
+        try:
+            results = VideosSearch(link, limit=1)
+            items = (await results.next()).get("result") or []
+            if not items:
+                raise RuntimeError("youtube-search-python returned no results")
+            result = items[0]
             title = result["title"]
             duration_min = result["duration"]
             thumbnail = result["thumbnails"][0]["url"].split("?")[0]
             vidid = result["id"]
-            if str(duration_min) == "None":
-                duration_sec = 0
-            else:
-                duration_sec = int(time_to_seconds(duration_min))
-        return title, duration_min, duration_sec, thumbnail, vidid
+            duration_sec = 0 if str(duration_min) == "None" else int(time_to_seconds(duration_min))
+            return title, duration_min, duration_sec, thumbnail, vidid
+        except Exception:
+            info = await _yt_dlp_info(link)
+            title = info.get("title") or "Unknown title"
+            duration_sec = int(info.get("duration") or 0)
+            duration_min = seconds_to_min(duration_sec) if duration_sec else None
+            thumbnail = info.get("thumbnail") or config.YOUTUBE_IMG_URL
+            vidid = info["id"]
+            return title, duration_min, duration_sec, thumbnail, vidid
 
     async def title(self, link: str, videoid: Union[bool, str] = None):
         if videoid:
@@ -172,13 +212,27 @@ class YouTubeAPI:
             link = self.base + link
         if "&" in link:
             link = link.split("&")[0]
-        results = VideosSearch(link, limit=1)
-        for result in (await results.next())["result"]:
+
+        try:
+            results = VideosSearch(link, limit=1)
+            items = (await results.next()).get("result") or []
+            if not items:
+                raise RuntimeError("youtube-search-python returned no results")
+            result = items[0]
             title = result["title"]
             duration_min = result["duration"]
             vidid = result["id"]
             yturl = result["link"]
             thumbnail = result["thumbnails"][0]["url"].split("?")[0]
+        except Exception:
+            info = await _yt_dlp_info(link)
+            title = info.get("title") or "Unknown title"
+            duration = int(info.get("duration") or 0)
+            duration_min = seconds_to_min(duration) if duration else None
+            vidid = info["id"]
+            yturl = info.get("webpage_url") or f"{self.base}{vidid}"
+            thumbnail = info.get("thumbnail") or config.YOUTUBE_IMG_URL
+
         track_details = {
             "title": title,
             "link": yturl,
