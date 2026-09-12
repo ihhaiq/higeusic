@@ -16,6 +16,8 @@ RUN apt-get update -y && \
 
 ENV DENO_INSTALL="/root/.deno"
 ENV PATH="${DENO_INSTALL}/bin:${PATH}"
+ENV YOUTUBE_POT_ENABLED="true"
+ENV YOUTUBE_POT_PROVIDER_URL="http://127.0.0.1:4416"
 
 # Native HTTP PO-token provider. It stays bound to localhost and is started
 # by ./start alongside the music bot.

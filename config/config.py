@@ -61,7 +61,20 @@ SPOTIFY_CLIENT_SECRET = getenv("SPOTIFY_CLIENT_SECRET", None)
 
 VIDEO_STREAM_LIMIT = int(getenv("VIDEO_STREAM_LIMIT", "2"))
 
-# Long YouTube videos are streamed directly; cap their output quality to keep\n# multiple simultaneous calls from exhausting Railway CPU/RAM.\nLONG_VIDEO_THRESHOLD_MIN = int(getenv("LONG_VIDEO_THRESHOLD_MIN", "30"))\nLONG_VIDEO_MAX_QUALITY = int(getenv("LONG_VIDEO_MAX_QUALITY", "480"))\n
+def _env_bool(name: str, default: bool) -> bool:
+    return getenv(name, str(default)).strip().lower() in {"1", "true", "yes", "on"}
+
+
+# YouTube extraction order: PO Token, Cookies (when present), then anonymous.
+YOUTUBE_POT_ENABLED = _env_bool("YOUTUBE_POT_ENABLED", True)
+YOUTUBE_POT_PROVIDER_URL = getenv(
+    "YOUTUBE_POT_PROVIDER_URL", "http://127.0.0.1:4416"
+).rstrip("/")
+YOUTUBE_EXTRACT_TIMEOUT = max(10, int(getenv("YOUTUBE_EXTRACT_TIMEOUT", "45")))
+
+# Long videos are streamed directly and capped to protect concurrent Railway calls.
+LONG_VIDEO_THRESHOLD_MIN = max(0, int(getenv("LONG_VIDEO_THRESHOLD_MIN", "30")))
+LONG_VIDEO_MAX_QUALITY = int(getenv("LONG_VIDEO_MAX_QUALITY", "480"))
 SERVER_PLAYLIST_LIMIT = int(getenv("SERVER_PLAYLIST_LIMIT", "50"))
 
 PLAYLIST_FETCH_LIMIT = int(getenv("PLAYLIST_FETCH_LIMIT", "50"))
