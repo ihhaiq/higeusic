@@ -189,8 +189,10 @@ async def play_commnd(
                 try:
                     details, track_id = await YouTube.track(url)
                 except Exception as e:
-                    print(e)
-                    return await mystic.edit_text(_["play_3"])
+                    LOGGER(__name__).warning(
+                        "فشل جلب معلومات رابط YouTube: %s", type(e).__name__
+                    )
+                    return await mystic.edit_text(YouTube.friendly_error(e))
                 streamtype = "youtube"
                 img = details["thumb"]
                 cap = _["play_11"].format(
@@ -344,9 +346,11 @@ async def play_commnd(
             query = query.replace("-v", "")
         try:
             details, track_id = await YouTube.track(query)
-        except Exception:
-            LOGGER(__name__).exception("فشل البحث عن معلومات المقطع في YouTube.")
-            return await mystic.edit_text(_["play_3"])
+        except Exception as e:
+            LOGGER(__name__).warning(
+                "فشل البحث عن معلومات المقطع في YouTube: %s", type(e).__name__
+            )
+            return await mystic.edit_text(YouTube.friendly_error(e))
         streamtype = "youtube"
     if str(playmode) == "Direct":
         if not plist_type:
@@ -477,8 +481,8 @@ async def play_music(client, CallbackQuery, _):
     )
     try:
         details, track_id = await YouTube.track(vidid, True)
-    except Exception:
-        return await mystic.edit_text(_["play_3"])
+    except Exception as e:
+        return await mystic.edit_text(YouTube.friendly_error(e))
     if details["duration_min"]:
         duration_sec = time_to_seconds(details["duration_min"])
         if duration_sec > config.DURATION_LIMIT:
