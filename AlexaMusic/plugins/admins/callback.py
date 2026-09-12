@@ -143,24 +143,47 @@ downvote = {}
 downvoters = {}
 
 
-@app.on_callback_query(filters.regex("ADMIN") & ~BANNED_USERS)
+@app.on_callback_query(filters.regex(r"^(ADMIN|RCTRL) ") & ~BANNED_USERS)
 @languageCB
 async def del_back_playlist(client, CallbackQuery, _):
     callback_data = CallbackQuery.data.strip()
-    callback_request = callback_data.split(None, 1)[1]
-    command, chat = callback_request.split("|")
+    prefix, callback_request = callback_data.split(None, 1)
+    rich_control = prefix == "RCTRL"
+
+    if rich_control:
+        try:
+            command, chat, requester = callback_request.split("|", 2)
+            requester_id = int(requester)
+        except Exception:
+            return await CallbackQuery.answer("بيانات التحكم غير صالحة.", show_alert=True)
+    else:
+        command, chat = callback_request.split("|")
+        requester_id = 0
+
     chat_id = int(chat)
     if not await is_active_chat(chat_id):
         return await CallbackQuery.answer(_["general_6"], show_alert=True)
+
     mention = CallbackQuery.from_user.mention
-    is_non_admin = await is_nonadmin_chat(CallbackQuery.message.chat.id)
-    if not is_non_admin and CallbackQuery.from_user.id not in SUDOERS:
-        admins = adminlist.get(CallbackQuery.message.chat.id)
-        if not admins:
-            return await CallbackQuery.answer(_["admin_18"], show_alert=True)
-        else:
-            if CallbackQuery.from_user.id not in admins:
-                return await CallbackQuery.answer(_["admin_19"], show_alert=True)
+    if rich_control:
+        if not await _can_use_rich_controls(
+            chat_id,
+            CallbackQuery.from_user.id,
+            requester_id,
+        ):
+            return await CallbackQuery.answer(
+                "غير مسموح لك بالتحكم بهذا التشغيل.",
+                show_alert=True,
+            )
+    else:
+        is_non_admin = await is_nonadmin_chat(CallbackQuery.message.chat.id)
+        if not is_non_admin and CallbackQuery.from_user.id not in SUDOERS:
+            admins = adminlist.get(CallbackQuery.message.chat.id)
+            if not admins:
+                return await CallbackQuery.answer(_["admin_18"], show_alert=True)
+            else:
+                if CallbackQuery.from_user.id not in admins:
+                    return await CallbackQuery.answer(_["admin_19"], show_alert=True)
     if command == "Pause":
         if not await is_music_playing(chat_id):
             return await CallbackQuery.answer(_["admin_1"], show_alert=True)
