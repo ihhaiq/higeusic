@@ -362,20 +362,17 @@ async def stream(
             )
             # theme = await check_theme(chat_id)
             img = await gen_thumb(vidid)
-            button = telegram_markup(_, chat_id)
-            run = await app.send_photo(
+            run = await send_stream_rich_message(
                 original_chat_id,
-                photo=img,
-                caption=_["stream_1"].format(
-                    title[:27],
-                    f"https://t.me/{app.username}?start=info_{vidid}",
-                    duration_min,
-                    user_name,
-                ),
-                reply_markup=InlineKeyboardMarkup(button),
+                image=img,
+                title=title,
+                is_video=bool(video),
+                requester_id=user_id,
+                info_url=f"https://t.me/{app.username}?start=info_{vidid}",
+                duration=duration_min,
             )
             db[chat_id][0]["mystic"] = run
-            db[chat_id][0]["markup"] = "tg"
+            db[chat_id][0]["markup"] = "rich"
     elif streamtype == "index":
         link = result
         title = "Index or M3u8 Link"
