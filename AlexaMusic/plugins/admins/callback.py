@@ -49,6 +49,53 @@ from AlexaMusic.utils.thumbnails import gen_thumb
 wrong = {}
 
 
+async def _can_use_rich_controls(chat_id: int, user_id: int, requester_id: int) -> bool:
+    if user_id == OWNER_ID or user_id in SUDOERS or user_id == requester_id:
+        return True
+    try:
+        member = await app.get_chat_member(chat_id, user_id)
+        return member.status == ChatMemberStatus.OWNER
+    except Exception:
+        return False
+
+
+@app.on_callback_query(filters.regex(r"^RICHCTRL ") & ~BANNED_USERS)
+@languageCB
+async def rich_control_panel(client, CallbackQuery: CallbackQuery, _):
+    try:
+        payload = CallbackQuery.data.split(None, 1)[1]
+        chat_value, requester_value = payload.split("|", 1)
+        chat_id = int(chat_value)
+        requester_id = int(requester_value)
+    except Exception:
+        return await CallbackQuery.answer("بيانات زر التحكم غير صالحة.", show_alert=True)
+
+    user_id = CallbackQuery.from_user.id
+    if not await _can_use_rich_controls(chat_id, user_id, requester_id):
+        return await CallbackQuery.answer(
+            "قائمة التحكم متاحة فقط لمطور البوت أو مالك القناة أو من بدأ التشغيل.",
+            show_alert=True,
+        )
+
+    try:
+        await send_control_panel_ephemeral(
+            chat_id,
+            receiver_user_id=user_id,
+            callback_query_id=str(CallbackQuery.id),
+            requester_id=requester_id,
+        )
+    except Exception:
+        return await CallbackQuery.answer(
+            "تعذر فتح قائمة التحكم المؤقتة.",
+            show_alert=True,
+        )
+
+    try:
+        await CallbackQuery.answer()
+    except Exception:
+        pass
+
+
 @app.on_callback_query(filters.regex("PanelMarkup") & ~BANNED_USERS)
 @languageCB
 async def markup_panel(client, CallbackQuery: CallbackQuery, _):
