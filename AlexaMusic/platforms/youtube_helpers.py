@@ -47,7 +47,9 @@ def build_attempts(
     if pot_enabled:
         attempts.append(
             YouTubeAttempt(
-                YouTubeAuthStrategy.PO_TOKEN, use_plugins=True, use_cookies=False
+                YouTubeAuthStrategy.PO_TOKEN,
+                use_plugins=True,
+                use_cookies=has_cookies,
             )
         )
     if has_cookies:

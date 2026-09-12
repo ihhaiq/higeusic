@@ -46,7 +46,7 @@ class YouTubeHelpersTest(unittest.TestCase):
             [attempt.strategy.value for attempt in attempts],
             ["po_token", "cookies", "anonymous"],
         )
-        self.assertFalse(attempts[0].use_cookies)
+        self.assertTrue(attempts[0].use_cookies)
         self.assertFalse(attempts[1].use_plugins)
         self.assertFalse(attempts[2].use_plugins)
 
@@ -56,6 +56,7 @@ class YouTubeHelpersTest(unittest.TestCase):
             [attempt.strategy.value for attempt in attempts],
             ["po_token", "anonymous"],
         )
+        self.assertFalse(attempts[0].use_cookies)
 
     def test_anonymous_is_always_available(self):
         attempts = helpers.build_attempts(pot_enabled=False, has_cookies=False)

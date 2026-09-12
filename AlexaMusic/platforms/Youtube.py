@@ -3,9 +3,9 @@
 """YouTube lookup, streaming URL extraction, and optional media downloads.
 
 All yt-dlp operations use the same isolated fallback order:
-PO Token -> Cookies (when configured) -> anonymous. No per-chat state is
-stored here, so concurrent calls cannot change each other's authentication
-mode or queue state.
+PO Token (+ Cookies when configured) -> Cookies-only -> anonymous.
+No per-chat state is stored here, so concurrent calls cannot change each
+other's authentication mode or queue state.
 """
 
 from __future__ import annotations
@@ -65,17 +65,35 @@ class YouTubeAPI:
         )
 
     def _attempt_args(self, attempt: YouTubeAttempt) -> list[str]:
+        path = cookiefile()
+
         if attempt.strategy is YouTubeAuthStrategy.PO_TOKEN:
-            return [
+            # Logged-out extraction: mweb + WebPO is the current recommended path.
+            # Logged-in extraction: web_creator + account cookies + WebPO avoids
+            # the broken/limited tv_downgraded cookie path seen in current yt-dlp.
+            player_clients = (
+                "web_creator,default" if attempt.use_cookies and path else "mweb"
+            )
+            args = [
                 "--extractor-args",
                 f"youtubepot-bgutilhttp:base_url={config.YOUTUBE_POT_PROVIDER_URL}",
                 "--extractor-args",
-                "youtube:player-client=mweb",
+                f"youtube:player_client={player_clients}",
             ]
+            if attempt.use_cookies and path:
+                args.extend(["--cookies", path])
+            return args
+
         args = ["--no-plugin-dirs"]
-        path = cookiefile()
         if attempt.use_cookies and path:
-            args.extend(["--cookies", path])
+            args.extend(
+                [
+                    "--cookies",
+                    path,
+                    "--extractor-args",
+                    "youtube:player_client=default,web_embedded",
+                ]
+            )
         return args
 
     def log_attempt(self, attempt: YouTubeAttempt, *, operation: str, chat_id=None):
@@ -83,7 +101,8 @@ class YouTubeAPI:
         if chat_id is not None:
             context += f" chat_id={chat_id}"
         if attempt.strategy is YouTubeAuthStrategy.PO_TOKEN:
-            LOGGER(__name__).info("Using PO Token%s", context)
+            label = "Using PO Token + Cookies" if attempt.use_cookies else "Using PO Token"
+            LOGGER(__name__).info("%s%s", label, context)
         elif attempt.strategy is YouTubeAuthStrategy.COOKIES:
             LOGGER(__name__).info("Using Cookies%s", context)
         else:
@@ -103,8 +122,9 @@ class YouTubeAPI:
         category = classify_youtube_error(error)
         detail = str(error).replace("\n", " ")[-500:]
         if attempt.strategy is YouTubeAuthStrategy.PO_TOKEN:
+            label = "PO Token + Cookies failed" if attempt.use_cookies else "PO Token failed"
             LOGGER(__name__).warning(
-                "PO Token failed %s category=%s: %s", context, category, detail
+                "%s %s category=%s: %s", label, context, category, detail
             )
         elif attempt.strategy is YouTubeAuthStrategy.COOKIES:
             label = (
@@ -367,7 +387,15 @@ class YouTubeAPI:
         if category == "age_restricted":
             return "هذا الفيديو مقيّد بالعمر، ولم تنجح محاولة Cookies المصرح بها."
         if category == "cookies_rejected":
-            return "انتهت صلاحية Cookies أو رفضها YouTube، وفشلت أيضاً محاولتا PO Token وAnonymous."
+            if cookiefile():
+                return (
+                    "رفض YouTube جلسة التشغيل حتى مع PO Token + Cookies. "
+                    "حدّث COOKIES من جلسة YouTube حديثة ثم أعد المحاولة."
+                )
+            return (
+                "YouTube يطلب تسجيل دخول من عنوان IP الخاص بالخادم. "
+                "PO Token وحده لم يتجاوز فحص البوت وCOOKIES غير مهيأة."
+            )
         if category == "live_unavailable":
             return (
                 "لا يمكن استخراج البث المباشر حالياً؛ قد يكون غير مباشر الآن أو انتهى."
