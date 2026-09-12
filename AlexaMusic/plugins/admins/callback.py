@@ -282,7 +282,8 @@ async def del_back_playlist(client, CallbackQuery, _):
         streamtype = check[0]["streamtype"]
         videoid = check[0]["vidid"]
         duration_min = check[0]["dur"]
-        user_id = CallbackQuery.message.from_user.id
+        requester_id = check[0].get("user_id") or CallbackQuery.from_user.id
+        original_chat_id = check[0].get("chat_id") or chat_id
         # theme = await check_theme(chat_id)
         status = True if str(streamtype) == "video" else None
         db[chat_id][0]["played"] = 0
@@ -297,18 +298,18 @@ async def del_back_playlist(client, CallbackQuery, _):
             except Exception:
                 return await CallbackQuery.message.reply_text(_["call_9"])
             # theme = await check_theme(chat_id)
-            button = telegram_markup(_, chat_id)
             img = await gen_thumb(videoid)
-            run = await CallbackQuery.message.reply_photo(
-                photo=img,
-                caption=_["stream_1"].format(
-                    user,
-                    f"https://t.me/{app.username}?start=info_{videoid}",
-                ),
-                reply_markup=InlineKeyboardMarkup(button),
+            run = await send_stream_rich_message(
+                original_chat_id,
+                image=img,
+                title=title,
+                is_video=str(streamtype) == "video",
+                requester_id=requester_id,
+                info_url=f"https://t.me/{app.username}?start=info_{videoid}",
+                duration=duration_min,
             )
             db[chat_id][0]["mystic"] = run
-            db[chat_id][0]["markup"] = "tg"
+            db[chat_id][0]["markup"] = "rich"
             await CallbackQuery.edit_message_text(txt)
         elif "vid_" in queued:
             mystic = await CallbackQuery.message.reply_text(
@@ -328,20 +329,18 @@ async def del_back_playlist(client, CallbackQuery, _):
             except Exception:
                 return await mystic.edit_text(_["call_9"])
             # theme = await check_theme(chat_id)
-            button = stream_markup(_, videoid, chat_id)
             img = await gen_thumb(videoid)
-            run = await CallbackQuery.message.reply_photo(
-                photo=img,
-                caption=_["stream_1"].format(
-                    title[:27],
-                    f"https://t.me/{app.username}?start=info_{videoid}",
-                    duration_min,
-                    user,
-                ),
-                reply_markup=InlineKeyboardMarkup(button),
+            run = await send_stream_rich_message(
+                original_chat_id,
+                image=img,
+                title=title,
+                is_video=str(streamtype) == "video",
+                requester_id=requester_id,
+                info_url=f"https://t.me/{app.username}?start=info_{videoid}",
+                duration=duration_min,
             )
             db[chat_id][0]["mystic"] = run
-            db[chat_id][0]["markup"] = "stream"
+            db[chat_id][0]["markup"] = "rich"
             await CallbackQuery.edit_message_text(txt)
             await mystic.delete()
         elif "index_" in queued:
@@ -349,14 +348,16 @@ async def del_back_playlist(client, CallbackQuery, _):
                 await Alexa.skip_stream(chat_id, videoid, video=status)
             except Exception:
                 return await CallbackQuery.message.reply_text(_["call_9"])
-            button = telegram_markup(_, chat_id)
-            run = await CallbackQuery.message.reply_photo(
-                photo=STREAM_IMG_URL,
-                caption=_["stream_2"].format(user),
-                reply_markup=InlineKeyboardMarkup(button),
+            run = await send_stream_rich_message(
+                original_chat_id,
+                image=STREAM_IMG_URL,
+                title="بث مباشر من رابط",
+                is_video=str(streamtype) == "video",
+                requester_id=requester_id,
+                duration=duration_min,
             )
             db[chat_id][0]["mystic"] = run
-            db[chat_id][0]["markup"] = "tg"
+            db[chat_id][0]["markup"] = "rich"
             await CallbackQuery.edit_message_text(txt)
         else:
             try:
