@@ -3,7 +3,7 @@
 """YouTube lookup, streaming URL extraction, and optional media downloads.
 
 All yt-dlp operations use the same isolated fallback order:
-PO Token (+ Cookies when configured) -> Cookies-only -> anonymous.
+PO Token player-client fallbacks -> Cookies-only -> anonymous.
 No per-chat state is stored here, so concurrent calls cannot change each
 other's authentication mode or queue state.
 """
@@ -27,8 +27,11 @@ from AlexaMusic.platforms.youtube_helpers import (
     YouTubeAuthStrategy,
     build_attempts,
     classify_youtube_error,
+    cookie_file_available,
     extraction_source,
+    friendly_youtube_error,
     is_youtube_url,
+    parse_player_clients,
 )
 from AlexaMusic.utils.database import is_on_off
 from AlexaMusic.utils.formatters import seconds_to_min
@@ -37,15 +40,13 @@ from AlexaMusic.utils.formatters import seconds_to_min
 class YouTubeExtractionError(RuntimeError):
     def __init__(self, errors: list[tuple[YouTubeAttempt, Exception]]):
         self.errors = errors
-        detail = (
-            str(errors[-1][1]) if errors else "yt-dlp failed without an error message"
-        )
-        super().__init__(detail)
+        last_error = errors[-1][1] if errors else RuntimeError("YouTube extraction failed")
+        super().__init__(friendly_youtube_error(last_error))
 
 
 def cookiefile() -> str | None:
-    path = os.path.join("cookies", "cookies.txt")
-    return path if os.path.isfile(path) and os.path.getsize(path) > 0 else None
+    path = getattr(config, "YOUTUBE_COOKIES_FILE", "cookies/cookies.txt")
+    return os.fspath(path) if cookie_file_available(path) else None
 
 
 class YouTubeAPI:
@@ -62,30 +63,27 @@ class YouTubeAPI:
         return build_attempts(
             pot_enabled=bool(config.YOUTUBE_POT_ENABLED),
             has_cookies=bool(cookiefile()),
+            player_clients=parse_player_clients(
+                getattr(config, "YOUTUBE_PLAYER_CLIENTS", None)
+            ),
         )
 
     def _attempt_args(self, attempt: YouTubeAttempt) -> list[str]:
         path = cookiefile()
 
         if attempt.strategy is YouTubeAuthStrategy.PO_TOKEN:
-            # Logged-out extraction: mweb + WebPO is the current recommended path.
-            # Logged-in extraction: web_creator + account cookies + WebPO avoids
-            # the broken/limited tv_downgraded cookie path seen in current yt-dlp.
-            player_clients = (
-                "web_creator,default" if attempt.use_cookies and path else "mweb"
-            )
-            args = [
+            client = attempt.player_client or "mweb"
+            return [
                 "--extractor-args",
                 f"youtubepot-bgutilhttp:base_url={config.YOUTUBE_POT_PROVIDER_URL}",
                 "--extractor-args",
-                f"youtube:player_client={player_clients}",
+                f"youtube:player_client={client}",
             ]
-            if attempt.use_cookies and path:
-                args.extend(["--cookies", path])
-            return args
 
         args = ["--no-plugin-dirs"]
-        if attempt.use_cookies and path:
+        if attempt.strategy is YouTubeAuthStrategy.COOKIES:
+            if not path:
+                raise RuntimeError("Cookies missing")
             args.extend(
                 [
                     "--cookies",
@@ -97,16 +95,22 @@ class YouTubeAPI:
         return args
 
     def log_attempt(self, attempt: YouTubeAttempt, *, operation: str, chat_id=None):
-        context = f" operation={operation}"
-        if chat_id is not None:
-            context += f" chat_id={chat_id}"
+        chat_context = f" chat_id={chat_id}" if chat_id is not None else ""
         if attempt.strategy is YouTubeAuthStrategy.PO_TOKEN:
-            label = "Using PO Token + Cookies" if attempt.use_cookies else "Using PO Token"
-            LOGGER(__name__).info("%s%s", label, context)
+            LOGGER(__name__).info(
+                "Using PO Token operation=%s client=%s%s",
+                operation,
+                attempt.player_client or "mweb",
+                chat_context,
+            )
         elif attempt.strategy is YouTubeAuthStrategy.COOKIES:
-            LOGGER(__name__).info("Using Cookies%s", context)
+            LOGGER(__name__).info("Using Cookies operation=%s%s", operation, chat_context)
         else:
-            LOGGER(__name__).info("Retrying without Cookies (Anonymous)%s", context)
+            LOGGER(__name__).info(
+                "Retrying without Cookies (Anonymous) operation=%s%s",
+                operation,
+                chat_context,
+            )
 
     def log_failure(
         self,
@@ -116,29 +120,37 @@ class YouTubeAPI:
         operation: str,
         chat_id=None,
     ):
-        context = f"operation={operation}"
-        if chat_id is not None:
-            context += f" chat_id={chat_id}"
+        chat_context = f" chat_id={chat_id}" if chat_id is not None else ""
         category = classify_youtube_error(error)
         detail = str(error).replace("\n", " ")[-500:]
         if attempt.strategy is YouTubeAuthStrategy.PO_TOKEN:
-            label = "PO Token + Cookies failed" if attempt.use_cookies else "PO Token failed"
             LOGGER(__name__).warning(
-                "%s %s category=%s: %s", label, context, category, detail
+                "PO Token failed operation=%s client=%s%s category=%s: %s",
+                operation,
+                attempt.player_client or "mweb",
+                chat_context,
+                category,
+                detail,
             )
         elif attempt.strategy is YouTubeAuthStrategy.COOKIES:
             label = (
-                "Cookies rejected"
+                "Cookies appear expired/rejected"
                 if category == "cookies_rejected"
                 else "Cookies failed"
             )
             LOGGER(__name__).warning(
-                "%s %s category=%s: %s", label, context, category, detail
+                "%s operation=%s%s category=%s: %s",
+                label,
+                operation,
+                chat_context,
+                category,
+                detail,
             )
         else:
             LOGGER(__name__).warning(
-                "Anonymous YouTube attempt failed %s category=%s: %s",
-                context,
+                "Anonymous YouTube attempt failed operation=%s%s category=%s: %s",
+                operation,
+                chat_context,
                 category,
                 detail,
             )
@@ -186,12 +198,25 @@ class YouTubeAPI:
         timeout: int | None = None,
     ) -> str:
         errors: list[tuple[YouTubeAttempt, Exception]] = []
+        seen_configs: set[tuple[str, ...]] = set()
         for attempt in self.stream_attempts():
+            try:
+                attempt_args = self._attempt_args(attempt)
+            except Exception as error:
+                errors.append((attempt, error))
+                self.log_failure(attempt, error, operation=operation)
+                continue
+
+            config_key = tuple(attempt_args)
+            if config_key in seen_configs:
+                continue
+            seen_configs.add(config_key)
+
             self.log_attempt(attempt, operation=operation)
             args = [
                 "--ignore-config",
                 "--no-warnings",
-                *self._attempt_args(attempt),
+                *attempt_args,
                 *base_args,
             ]
             try:
@@ -381,28 +406,7 @@ class YouTubeAPI:
         return track_details, vidid
 
     def friendly_error(self, error: object) -> str:
-        category = classify_youtube_error(error)
-        if category == "private":
-            return "هذا الفيديو خاص ولا يمكن للبوت تشغيله."
-        if category == "age_restricted":
-            return "هذا الفيديو مقيّد بالعمر، ولم تنجح محاولة Cookies المصرح بها."
-        if category == "cookies_rejected":
-            if cookiefile():
-                return (
-                    "رفض YouTube جلسة التشغيل حتى مع PO Token + Cookies. "
-                    "حدّث COOKIES من جلسة YouTube حديثة ثم أعد المحاولة."
-                )
-            return (
-                "YouTube يطلب تسجيل دخول من عنوان IP الخاص بالخادم. "
-                "PO Token وحده لم يتجاوز فحص البوت وCOOKIES غير مهيأة."
-            )
-        if category == "live_unavailable":
-            return (
-                "لا يمكن استخراج البث المباشر حالياً؛ قد يكون غير مباشر الآن أو انتهى."
-            )
-        if category == "unavailable":
-            return "فيديو YouTube غير متاح في الوقت الحالي أو في موقع الخادم."
-        return "تعذر استخراج فيديو YouTube بعد محاولات PO Token وCookies وAnonymous."
+        return friendly_youtube_error(error)
 
     async def formats(self, link: str, videoid: Union[bool, str] = None):
         info = await self.info(link, videoid)

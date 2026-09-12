@@ -70,6 +70,14 @@ YOUTUBE_POT_ENABLED = _env_bool("YOUTUBE_POT_ENABLED", True)
 YOUTUBE_POT_PROVIDER_URL = getenv(
     "YOUTUBE_POT_PROVIDER_URL", "http://127.0.0.1:4416"
 ).rstrip("/")
+YOUTUBE_PLAYER_CLIENTS = getenv(
+    "YOUTUBE_PLAYER_CLIENTS", "mweb,web_safari,tv,web"
+)
+YOUTUBE_AUTO_UPDATE_TOOLS = _env_bool("YOUTUBE_AUTO_UPDATE_TOOLS", True)
+YOUTUBE_COOKIES_FILE = (
+    (getenv("YOUTUBE_COOKIES_FILE", "cookies/cookies.txt") or "cookies/cookies.txt").strip()
+    or "cookies/cookies.txt"
+)
 YOUTUBE_EXTRACT_TIMEOUT = max(10, int(getenv("YOUTUBE_EXTRACT_TIMEOUT", "45")))
 
 # Long videos are streamed directly and capped to protect concurrent Railway calls.

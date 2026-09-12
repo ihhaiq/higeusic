@@ -19,6 +19,7 @@ from AlexaMusic import LOGGER, app, userbot
 from AlexaMusic.core.call import Alexa
 from AlexaMusic.core.cookies import save_cookies
 from AlexaMusic.core.rich_callbacks import run_rich_callback_polling
+from AlexaMusic.core.youtube_health import log_youtube_health
 from AlexaMusic.misc import sudo
 from AlexaMusic.plugins import ALL_MODULES
 from AlexaMusic.utils.database import get_banned_users, get_gbanned
@@ -40,6 +41,7 @@ async def init() -> None:
         pass
     await app.start()
     await save_cookies()
+    log_youtube_health()
     for module in ALL_MODULES:
         importlib.import_module(f"AlexaMusic.plugins{module}")
     LOGGER("AlexaMusic.plugins").info("Necessary Modules Imported Successfully.")

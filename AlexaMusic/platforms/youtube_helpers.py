@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from enum import Enum
 from urllib.parse import urlparse
+
+SUPPORTED_YOUTUBE_PLAYER_CLIENTS = ("mweb", "web_safari", "tv", "web")
+DEFAULT_YOUTUBE_PLAYER_CLIENTS = SUPPORTED_YOUTUBE_PLAYER_CLIENTS
 
 
 class YouTubeAuthStrategy(str, Enum):
@@ -18,6 +22,38 @@ class YouTubeAttempt:
     strategy: YouTubeAuthStrategy
     use_plugins: bool
     use_cookies: bool
+    player_client: str | None = None
+
+
+def parse_player_clients(value: object) -> tuple[str, ...]:
+    """Parse a safe, ordered, de-duplicated YouTube player-client list."""
+    if isinstance(value, str):
+        candidates = value.split(",")
+    elif isinstance(value, (list, tuple)):
+        candidates = value
+    else:
+        candidates = ()
+
+    clients: list[str] = []
+    seen: set[str] = set()
+    for raw_client in candidates:
+        try:
+            client = str(raw_client).strip().lower()
+        except Exception:
+            continue
+        if client not in SUPPORTED_YOUTUBE_PLAYER_CLIENTS or client in seen:
+            continue
+        seen.add(client)
+        clients.append(client)
+    return tuple(clients) or ("mweb",)
+
+
+def cookie_file_available(path: object) -> bool:
+    try:
+        candidate = os.fspath(path)
+        return bool(candidate) and os.path.isfile(candidate) and os.path.getsize(candidate) > 0
+    except (OSError, TypeError, ValueError):
+        return False
 
 
 def is_youtube_url(value: str) -> bool:
@@ -41,26 +77,35 @@ def extraction_source(query: str, limit: int = 1) -> str:
 
 
 def build_attempts(
-    *, pot_enabled: bool, has_cookies: bool
+    *,
+    pot_enabled: bool,
+    has_cookies: bool,
+    player_clients: object = None,
 ) -> tuple[YouTubeAttempt, ...]:
     attempts: list[YouTubeAttempt] = []
     if pot_enabled:
-        attempts.append(
-            YouTubeAttempt(
-                YouTubeAuthStrategy.PO_TOKEN,
-                use_plugins=True,
-                use_cookies=has_cookies,
+        for client in parse_player_clients(player_clients):
+            attempts.append(
+                YouTubeAttempt(
+                    YouTubeAuthStrategy.PO_TOKEN,
+                    use_plugins=True,
+                    use_cookies=False,
+                    player_client=client,
+                )
             )
-        )
     if has_cookies:
         attempts.append(
             YouTubeAttempt(
-                YouTubeAuthStrategy.COOKIES, use_plugins=False, use_cookies=True
+                YouTubeAuthStrategy.COOKIES,
+                use_plugins=False,
+                use_cookies=True,
             )
         )
     attempts.append(
         YouTubeAttempt(
-            YouTubeAuthStrategy.ANONYMOUS, use_plugins=False, use_cookies=False
+            YouTubeAuthStrategy.ANONYMOUS,
+            use_plugins=False,
+            use_cookies=False,
         )
     )
     return tuple(attempts)
@@ -125,3 +170,21 @@ def classify_youtube_error(error: object) -> str:
     ):
         return "unavailable"
     return "unknown"
+
+
+def friendly_youtube_error(error: object) -> str:
+    category = classify_youtube_error(error)
+    if category == "private":
+        return "هذا الفيديو خاص ولا يمكن للبوت تشغيله."
+    if category == "age_restricted":
+        return "هذا الفيديو مقيّد بالعمر، ولم تنجح محاولة Cookies المصرح بها."
+    if category == "cookies_rejected":
+        return (
+            "تعذر استخراج الفيديو من YouTube. يبدو أن YouTube طلب تسجيل الدخول "
+            "أو رفض طلب الخادم. جرّب لاحقاً أو أضف Cookies صالحة من إعدادات السيرفر."
+        )
+    if category == "live_unavailable":
+        return "لا يمكن استخراج البث المباشر حالياً؛ قد يكون غير مباشر الآن أو انتهى."
+    if category == "unavailable":
+        return "فيديو YouTube غير متاح في الوقت الحالي أو في موقع الخادم."
+    return "تعذر استخراج فيديو YouTube بعد محاولات PO Token وCookies وAnonymous."
