@@ -457,15 +457,17 @@ class Call(PyTgCalls):
                         original_chat_id,
                         text=_["call_9"],
                     )
-                button = telegram_markup(_, chat_id)
-                run = await app.send_photo(
+                requester_id = check[0].get("user_id") or config.OWNER_ID
+                run = await send_stream_rich_message(
                     original_chat_id,
-                    photo=config.STREAM_IMG_URL,
-                    caption=_["stream_2"].format(user),
-                    reply_markup=InlineKeyboardMarkup(button),
+                    image=config.STREAM_IMG_URL,
+                    title="بث مباشر من رابط",
+                    is_video=str(streamtype) == "video",
+                    requester_id=requester_id,
+                    duration=check[0]["dur"],
                 )
                 db[chat_id][0]["mystic"] = run
-                db[chat_id][0]["markup"] = "tg"
+                db[chat_id][0]["markup"] = "rich"
             else:
                 if videoid in ["telegram", "soundcloud"]:
                     image = None
