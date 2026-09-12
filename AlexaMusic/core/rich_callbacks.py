@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 
 from aiogram import Bot, Dispatcher, F
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import CallbackQuery
 
 import config
@@ -11,8 +12,26 @@ from AlexaMusic.utils.database import get_lang
 from AlexaMusic.utils.rich_stream import send_control_panel_ephemeral
 from strings import get_string
 
-
 dispatcher = Dispatcher()
+
+
+def _expired_callback(error: BaseException) -> bool:
+    message = str(error).casefold()
+    return "query is too old" in message or "query id is invalid" in message
+
+
+async def _safe_answer(callback: CallbackQuery, text=None, *, show_alert=False):
+    try:
+        await callback.answer(text=text, show_alert=show_alert)
+        return True
+    except TelegramBadRequest as error:
+        if _expired_callback(error):
+            LOGGER(__name__).warning(
+                "Ignored expired rich callback query callback_id=%s",
+                callback.id,
+            )
+            return False
+        raise
 
 
 async def _language_for_chat(chat_id: int):
@@ -33,7 +52,11 @@ async def open_rich_control_panel(callback: CallbackQuery) -> None:
         chat_id = int(chat_value)
         requester_id = int(requester_value)
     except Exception:
-        await callback.answer("بيانات زر التحكم غير صالحة.", show_alert=True)
+        await _safe_answer(
+            callback,
+            "بيانات زر التحكم غير صالحة.",
+            show_alert=True,
+        )
         return
 
     # Import lazily after the Pyrogram plugin set has already been loaded.
@@ -41,7 +64,8 @@ async def open_rich_control_panel(callback: CallbackQuery) -> None:
 
     user_id = callback.from_user.id
     if not await _can_use_rich_controls(chat_id, user_id, requester_id):
-        await callback.answer(
+        await _safe_answer(
+            callback,
             "قائمة التحكم متاحة فقط لمطور البوت أو مالك القناة أو من بدأ التشغيل.",
             show_alert=True,
         )
@@ -54,18 +78,32 @@ async def open_rich_control_panel(callback: CallbackQuery) -> None:
             callback_query_id=str(callback.id),
             requester_id=requester_id,
         )
+    except TelegramBadRequest as error:
+        if _expired_callback(error):
+            LOGGER(__name__).warning(
+                "Rich control callback expired before the ephemeral panel opened "
+                "callback_id=%s",
+                callback.id,
+            )
+        else:
+            LOGGER(__name__).exception("Failed to open rich ephemeral control panel")
+            await _safe_answer(
+                callback,
+                "تعذر فتح قائمة التحكم المؤقتة.",
+                show_alert=True,
+            )
+        return
     except Exception:
         LOGGER(__name__).exception("Failed to open rich ephemeral control panel")
-        await callback.answer(
+        await _safe_answer(
+            callback,
             "تعذر فتح قائمة التحكم المؤقتة.",
             show_alert=True,
         )
         return
 
-    try:
-        await callback.answer()
-    except Exception:
-        pass
+    # Sending the ephemeral message with callback_query_id consumes the query;
+    # answering it again would itself produce "query ID is invalid".
 
 
 class _AiogramCallbackAdapter:
@@ -145,7 +183,9 @@ async def run_rich_callback_polling() -> None:
     bot = Bot(token=config.BOT_TOKEN)
     try:
         # getUpdates cannot run while a Bot API webhook is configured.
-        await bot.delete_webhook(drop_pending_updates=False)
+        # Old callback IDs cannot open ephemeral messages and otherwise create
+        # a traceback loop after a Railway restart.
+        await bot.delete_webhook(drop_pending_updates=True)
         LOGGER(__name__).info(
             "Starting aiogram callback polling for rich/ephemeral controls."
         )

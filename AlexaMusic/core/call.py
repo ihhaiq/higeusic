@@ -124,6 +124,12 @@ async def _play_media_with_fallback(
     group_config=None,
 ):
     youtube = isinstance(link, str) and YouTube.is_youtube_url(link)
+    LOGGER(__name__).info(
+        "Preparing media stream chat_id=%s mode=%s source=%s",
+        chat_id,
+        "video" if video else "audio",
+        "youtube" if youtube else "direct",
+    )
     attempts = YouTube.stream_attempts() if youtube else (None,)
     errors = []
     for attempt in attempts:
@@ -160,9 +166,10 @@ async def _play_media_with_fallback(
             await player.play(chat_id, stream, **kwargs)
             if youtube:
                 LOGGER(__name__).info(
-                    "Streaming directly from YouTube chat_id=%s strategy=%s",
+                    "Streaming directly from YouTube chat_id=%s strategy=%s mode=%s",
                     chat_id,
                     attempt.strategy.value,
+                    "video" if video else "audio",
                 )
             return
         except YtDlpError as error:
@@ -355,7 +362,11 @@ class Call(PyTgCalls):
         assistant = await group_assistant(self, chat_id)
         ksk = GroupCallConfig(auto_start=False)
         audio_stream_quality = await get_audio_bitrate(chat_id)
-        video_stream_quality = await _video_quality_for_duration(chat_id, duration)
+        video_stream_quality = (
+            await _video_quality_for_duration(chat_id, duration)
+            if video
+            else await get_video_bitrate(chat_id)
+        )
 
         no_active_retried = False
         while True:
