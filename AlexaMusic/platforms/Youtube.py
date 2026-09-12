@@ -41,19 +41,21 @@ async def _yt_dlp_info(query: str):
     """Fetch one YouTube result with yt-dlp.
 
     Plain text is searched with ytsearch1; YouTube URLs are read directly.
-    This avoids relying exclusively on youtube-search-python, which can break
-    when YouTube changes its internal response format.
+    A stale cookie session can make otherwise-public videos fail, so public
+    metadata gets one anonymous retry before we surface the authentication
+    error to the user.
     """
     source = query if re.search(r"(?:youtube\.com|youtu\.be)", query) else f"ytsearch1:{query}"
 
-    def extract():
+    def extract(use_cookies: bool):
         opts = {
             "quiet": True,
             "no_warnings": True,
             "skip_download": True,
             "noplaylist": True,
-            "cookiefile": cookiefile(),
         }
+        if use_cookies and cookiefile():
+            opts["cookiefile"] = cookiefile()
         with YoutubeDL(opts) as ydl:
             info = ydl.extract_info(source, download=False)
             if isinstance(info, dict) and info.get("entries") is not None:
@@ -65,7 +67,19 @@ async def _yt_dlp_info(query: str):
                 raise RuntimeError("YouTube metadata is unavailable")
             return info
 
-    return await asyncio.to_thread(extract)
+    try:
+        return await asyncio.to_thread(extract, True)
+    except Exception as error:
+        text = str(error).lower()
+        if cookiefile() and (
+            "sign in to confirm you’re not a bot" in text
+            or "sign in to confirm you're not a bot" in text
+        ):
+            LOGGER(__name__).warning(
+                "YouTube rejected cookies while reading metadata; retrying once without cookies."
+            )
+            return await asyncio.to_thread(extract, False)
+        raise
 
 
 class YouTubeAPI:
