@@ -252,43 +252,6 @@ async def _handle_rich_control_action(
     return await CallbackQuery.answer("أمر تحكم غير معروف.", show_alert=True)
 
 
-@app.on_callback_query(filters.regex(r"^RICHCTRL ") & ~BANNED_USERS)
-@languageCB
-async def rich_control_panel(client, CallbackQuery: CallbackQuery, _):
-    try:
-        payload = CallbackQuery.data.split(None, 1)[1]
-        chat_value, requester_value = payload.split("|", 1)
-        chat_id = int(chat_value)
-        requester_id = int(requester_value)
-    except Exception:
-        return await CallbackQuery.answer("بيانات زر التحكم غير صالحة.", show_alert=True)
-
-    user_id = CallbackQuery.from_user.id
-    if not await _can_use_rich_controls(chat_id, user_id, requester_id):
-        return await CallbackQuery.answer(
-            "قائمة التحكم متاحة فقط لمطور البوت أو مالك القناة أو من بدأ التشغيل.",
-            show_alert=True,
-        )
-
-    try:
-        await send_control_panel_ephemeral(
-            chat_id,
-            receiver_user_id=user_id,
-            callback_query_id=str(CallbackQuery.id),
-            requester_id=requester_id,
-        )
-    except Exception:
-        return await CallbackQuery.answer(
-            "تعذر فتح قائمة التحكم المؤقتة.",
-            show_alert=True,
-        )
-
-    try:
-        await CallbackQuery.answer()
-    except Exception:
-        pass
-
-
 @app.on_callback_query(filters.regex("PanelMarkup") & ~BANNED_USERS)
 @languageCB
 async def markup_panel(client, CallbackQuery: CallbackQuery, _):
@@ -336,53 +299,25 @@ downvote = {}
 downvoters = {}
 
 
-@app.on_callback_query(filters.regex(r"^(ADMIN|RCTRL) ") & ~BANNED_USERS)
+@app.on_callback_query(filters.regex(r"^ADMIN ") & ~BANNED_USERS)
 @languageCB
 async def del_back_playlist(client, CallbackQuery, _):
     callback_data = CallbackQuery.data.strip()
-    prefix, callback_request = callback_data.split(None, 1)
-    rich_control = prefix == "RCTRL"
-
-    if rich_control:
-        try:
-            command, chat, requester = callback_request.split("|", 2)
-            requester_id = int(requester)
-        except Exception:
-            return await CallbackQuery.answer("بيانات التحكم غير صالحة.", show_alert=True)
-    else:
-        command, chat = callback_request.split("|")
-        requester_id = 0
-
+    callback_request = callback_data.split(None, 1)[1]
+    command, chat = callback_request.split("|")
     chat_id = int(chat)
+
     if not await is_active_chat(chat_id):
         return await CallbackQuery.answer(_["general_6"], show_alert=True)
 
     mention = CallbackQuery.from_user.mention
-    if rich_control:
-        if not await _can_use_rich_controls(
-            chat_id,
-            CallbackQuery.from_user.id,
-            requester_id,
-        ):
-            return await CallbackQuery.answer(
-                "غير مسموح لك بالتحكم بهذا التشغيل.",
-                show_alert=True,
-            )
-        return await _handle_rich_control_action(
-            CallbackQuery,
-            _,
-            command,
-            chat_id,
-        )
-    else:
-        is_non_admin = await is_nonadmin_chat(CallbackQuery.message.chat.id)
-        if not is_non_admin and CallbackQuery.from_user.id not in SUDOERS:
-            admins = adminlist.get(CallbackQuery.message.chat.id)
-            if not admins:
-                return await CallbackQuery.answer(_["admin_18"], show_alert=True)
-            else:
-                if CallbackQuery.from_user.id not in admins:
-                    return await CallbackQuery.answer(_["admin_19"], show_alert=True)
+    is_non_admin = await is_nonadmin_chat(CallbackQuery.message.chat.id)
+    if not is_non_admin and CallbackQuery.from_user.id not in SUDOERS:
+        admins = adminlist.get(CallbackQuery.message.chat.id)
+        if not admins:
+            return await CallbackQuery.answer(_["admin_18"], show_alert=True)
+        if CallbackQuery.from_user.id not in admins:
+            return await CallbackQuery.answer(_["admin_19"], show_alert=True)
     if command == "Pause":
         if not await is_music_playing(chat_id):
             return await CallbackQuery.answer(_["admin_1"], show_alert=True)
