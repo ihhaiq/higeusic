@@ -61,6 +61,7 @@ SPOTIFY_CLIENT_SECRET = getenv("SPOTIFY_CLIENT_SECRET", None)
 
 VIDEO_STREAM_LIMIT = int(getenv("VIDEO_STREAM_LIMIT", "2"))
 
+# Long YouTube videos are streamed directly; cap their output quality to keep\n# multiple simultaneous calls from exhausting Railway CPU/RAM.\nLONG_VIDEO_THRESHOLD_MIN = int(getenv("LONG_VIDEO_THRESHOLD_MIN", "30"))\nLONG_VIDEO_MAX_QUALITY = int(getenv("LONG_VIDEO_MAX_QUALITY", "480"))\n
 SERVER_PLAYLIST_LIMIT = int(getenv("SERVER_PLAYLIST_LIMIT", "50"))
 
 PLAYLIST_FETCH_LIMIT = int(getenv("PLAYLIST_FETCH_LIMIT", "50"))
