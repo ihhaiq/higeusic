@@ -387,6 +387,7 @@ async def stream(
                 user_name,
                 link,
                 "video" if video else "audio",
+                user_id=user_id,
             )
             position = len(db.get(chat_id)) - 1
             await mystic.edit_text(
@@ -410,15 +411,17 @@ async def stream(
                 user_name,
                 link,
                 "video" if video else "audio",
+                user_id=user_id,
                 forceplay=forceplay,
             )
-            button = telegram_markup(_, chat_id)
-            run = await app.send_photo(
+            run = await send_stream_rich_message(
                 original_chat_id,
-                photo=config.STREAM_IMG_URL,
-                caption=_["stream_2"].format(user_name),
-                reply_markup=InlineKeyboardMarkup(button),
+                image=config.STREAM_IMG_URL,
+                title="بث مباشر من رابط",
+                is_video=bool(video),
+                requester_id=user_id,
+                duration=duration_min,
             )
             db[chat_id][0]["mystic"] = run
-            db[chat_id][0]["markup"] = "tg"
+            db[chat_id][0]["markup"] = "rich"
             await mystic.delete()
