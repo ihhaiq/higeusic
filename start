@@ -19,6 +19,20 @@ cleanup() {
 
 trap cleanup EXIT INT TERM
 
+AUTO_UPDATE_TOOLS="${YOUTUBE_AUTO_UPDATE_TOOLS:-true}"
+case "${AUTO_UPDATE_TOOLS}" in
+    1|true|TRUE|yes|YES|on|ON) AUTO_UPDATE_TOOLS=1 ;;
+    *) AUTO_UPDATE_TOOLS=0 ;;
+esac
+
+if [ "${AUTO_UPDATE_TOOLS}" -eq 1 ]; then
+    if [ -f "scripts/update_youtube_tools.sh" ]; then
+        bash scripts/update_youtube_tools.sh
+    else
+        echo "[YouTube tools] WARNING: updater script is missing; continuing with the installed yt-dlp." >&2
+    fi
+fi
+
 POT_ENABLED="${YOUTUBE_POT_ENABLED:-true}"
 case "${POT_ENABLED}" in
     1|true|TRUE|yes|YES|on|ON) POT_ENABLED=1 ;;
