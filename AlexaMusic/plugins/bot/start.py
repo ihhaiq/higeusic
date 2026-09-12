@@ -11,22 +11,17 @@ as you want or you can collabe if you have new ideas.
 
 import asyncio
 
-from pyrogram import filters
 from pyrogram import enums, filters
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message
-from youtubesearchpython.__future__ import VideosSearch
 
 import config
-from config import BANNED_USERS
-from config.config import OWNER_ID
-from strings import get_command, get_string
 from AlexaMusic import Telegram, YouTube, app
 from AlexaMusic.misc import SUDOERS
 from AlexaMusic.plugins.play.playlist import del_plist_msg
 from AlexaMusic.plugins.sudo.sudoers import sudoers_list
+from AlexaMusic.utils.command import commandpro
 from AlexaMusic.utils.database import (
     add_served_chat,
-    is_served_user,
     add_served_user,
     blacklisted_chats,
     get_assistant,
@@ -34,10 +29,13 @@ from AlexaMusic.utils.database import (
     get_userss,
     is_on_off,
     is_served_private_chat,
+    is_served_user,
 )
 from AlexaMusic.utils.decorators.language import LanguageStart
 from AlexaMusic.utils.inline import help_pannel, private_panel, start_pannel
-from AlexaMusic.utils.command import commandpro
+from config import BANNED_USERS
+from config.config import OWNER_ID
+from strings import get_command, get_string
 
 loop = asyncio.get_running_loop()
 
@@ -132,16 +130,26 @@ async def start_comm(client, message: Message, _):
             m = await message.reply_text("🔎")
             query = (str(name)).replace("info_", "", 1)
             query = f"https://www.youtube.com/watch?v={query}"
-            results = VideosSearch(query, limit=1)
-            for result in (await results.next())["result"]:
-                title = result["title"]
-                duration = result["duration"]
-                views = result["viewCount"]["short"]
-                thumbnail = result["thumbnails"][0]["url"].split("?")[0]
-                channellink = result["channel"]["link"]
-                channel = result["channel"]["name"]
-                link = result["link"]
-                published = result["publishedTime"]
+            try:
+                result = await YouTube.info(query)
+            except Exception as error:
+                await m.delete()
+                return await message.reply_text(YouTube.friendly_error(error))
+            title = result.get("title") or "Unknown title"
+            duration_seconds = int(result.get("duration") or 0)
+            duration = (
+                f"{duration_seconds // 60}:{duration_seconds % 60:02d}"
+                if duration_seconds
+                else "بث مباشر"
+            )
+            views = f"{int(result.get('view_count') or 0):,}"
+            thumbnail = result.get("thumbnail") or config.YOUTUBE_IMG_URL
+            channellink = (
+                result.get("channel_url") or result.get("uploader_url") or query
+            )
+            channel = result.get("channel") or result.get("uploader") or "غير معروف"
+            link = result.get("webpage_url") or query
+            published = result.get("upload_date") or "غير معروف"
             searched_text = f"""
 🎵 **معلومات المقطع**
 
@@ -271,7 +279,7 @@ async def welcome(client, message: Message):
                     _["start_5"].format(config.MUSIC_BOT_NAME, member.mention)
                 )
             return
-        except:
+        except Exception:
             return
 
 
@@ -299,5 +307,4 @@ async def verify(client, message: Message):
     await message.reply_photo(
         photo="https://telegra.ph/file/7f08acd78577f99f60ff5.png",
         caption="✅ تم تسجيلك بنجاح في قاعدة مستخدمي البوت.",
-
     )

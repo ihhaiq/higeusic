@@ -15,9 +15,7 @@ import textwrap
 
 import aiofiles
 import aiohttp
-
 from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont, ImageOps
-from youtubesearchpython.__future__ import VideosSearch
 
 from config import YOUTUBE_IMG_URL
 
@@ -36,27 +34,18 @@ async def gen_thumb(videoid):
 
     url = f"https://www.youtube.com/watch?v={videoid}"
     try:
-        results = VideosSearch(url, limit=1)
-        for result in (await results.next())["result"]:
-            try:
-                title = result["title"]
-                title = re.sub(r"\W+", " ", title)
-                title = title.title()
-            except Exception:
-                title = "Unsupported Title"
-            try:
-                duration = result["duration"]
-            except Exception:
-                duration = "Unknown Mins"
-            thumbnail = result["thumbnails"][0]["url"].split("?")[0]
-            try:
-                views = result["viewCount"]["short"]
-            except Exception:
-                views = "Unknown Views"
-            try:
-                channel = result["channel"]["name"]
-            except Exception:
-                channel = "Unknown Channel"
+        from AlexaMusic import YouTube
+
+        result = await YouTube.info(url)
+        title = re.sub(r"\W+", " ", result.get("title") or "Unsupported Title").title()
+        duration_seconds = int(result.get("duration") or 0)
+        duration = (
+            f"{duration_seconds // 60}:{duration_seconds % 60:02d}"
+            if duration_seconds
+            else "Live"
+        )
+        thumbnail = result.get("thumbnail") or YOUTUBE_IMG_URL
+        views = f"{int(result.get('view_count') or 0):,}"
 
         async with aiohttp.ClientSession() as session:
             async with session.get(thumbnail) as resp:
@@ -147,27 +136,18 @@ async def gen_qthumb(videoid):
 
     url = f"https://www.youtube.com/watch?v={videoid}"
     try:
-        results = VideosSearch(url, limit=1)
-        for result in (await results.next())["result"]:
-            try:
-                title = result["title"]
-                title = re.sub(r"\W+", " ", title)
-                title = title.title()
-            except Exception:
-                title = "Unsupported Title"
-            try:
-                duration = result["duration"]
-            except Exception:
-                duration = "Unknown Mins"
-            thumbnail = result["thumbnails"][0]["url"].split("?")[0]
-            try:
-                views = result["viewCount"]["short"]
-            except Exception:
-                views = "Unknown Views"
-            try:
-                channel = result["channel"]["name"]
-            except Exception:
-                channel = "Unknown Channel"
+        from AlexaMusic import YouTube
+
+        result = await YouTube.info(url)
+        title = re.sub(r"\W+", " ", result.get("title") or "Unsupported Title").title()
+        duration_seconds = int(result.get("duration") or 0)
+        duration = (
+            f"{duration_seconds // 60}:{duration_seconds % 60:02d}"
+            if duration_seconds
+            else "Live"
+        )
+        thumbnail = result.get("thumbnail") or YOUTUBE_IMG_URL
+        views = f"{int(result.get('view_count') or 0):,}"
 
         async with aiohttp.ClientSession() as session:
             async with session.get(thumbnail) as resp:

@@ -20,7 +20,11 @@
 
 - `MONGO_DB_URI`: عند عدم توفره يستخدم البوت قاعدة JSON المحلية.
 - `JSON_DB_PATH`: يفضل ضبطه على مسار Railway Volume مثل `/data/database.json`.
-- `COOKIES`: محتوى cookies.txt بصيغة Netscape لاستخدامه مع YouTube.
+- `COOKIES`: محتوى cookies.txt بصيغة Netscape كخيار احتياطي لـ YouTube.
+- `YOUTUBE_POT_ENABLED`: مفعّل افتراضياً لتشغيل مزود PO Token المحلي تلقائياً.
+- `YOUTUBE_POT_PROVIDER_URL`: عنوان المزود، افتراضياً `http://127.0.0.1:4416`.
+- `YOUTUBE_EXTRACT_TIMEOUT`: مهلة كل محاولة استخراج بالثواني، افتراضياً `45`.
+- `LONG_VIDEO_THRESHOLD_MIN` و`LONG_VIDEO_MAX_QUALITY`: حد مدة الفيديو وجودة الفيديوهات الطويلة، افتراضياً 30 دقيقة و480p.
 - `SPOTIFY_CLIENT_ID` و`SPOTIFY_CLIENT_SECRET`.
 - `START_IMG_URL` وبقية متغيرات صور الواجهة.
 
@@ -39,8 +43,10 @@ python genstring.py
 المشروع يحتوي `Dockerfile` ويبدأ عبر:
 
 ```bash
-python3 -m AlexaMusic
+bash start
 ```
+
+تثبت صورة Docker مزود `bgutil-ytdlp-pot-provider` وتشغله محلياً مع البوت بلا خدمة إضافية أو إعداد يدوي. ترتيب محاولات YouTube هو PO Token ثم Cookies عند توفرها ثم Anonymous. يمكن إبقاء `COOKIES` فارغاً ما لم تحتج فيديوهات تتطلب حساباً، مثل بعض المقاطع المقيدة بالعمر.
 
 إذا كنت تستخدم JSON بدلاً من MongoDB وتريد الاحتفاظ بالبيانات بعد إعادة النشر، اربط Railway Volume واضبط:
 

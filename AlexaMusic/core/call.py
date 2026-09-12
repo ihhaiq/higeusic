@@ -11,40 +11,35 @@ as you want or you can collabe if you have new ideas.
 
 import asyncio
 import contextlib
-import os
-from datetime import datetime, timedelta
 from typing import Union
 
+from ntgcalls import TelegramServerError
 from pyrogram import Client
-from pyrogram.errors import FloodWait, ChatAdminRequired
+from pyrogram.errors import ChatAdminRequired, FloodWait
 from pytgcalls import PyTgCalls
 from pytgcalls import filters as fl
-from ntgcalls import TelegramServerError
 from pytgcalls.exceptions import NoActiveGroupCall, YtDlpError
 from pytgcalls.types import (
+    AudioQuality,
     ChatUpdate,
+    GroupCallConfig,
     MediaStream,
     StreamEnded,
-    GroupCallConfig,
-    GroupCallParticipant,
-    UpdatedGroupCallParticipant,
-    AudioQuality,
     VideoQuality,
 )
 
 import config
 from AlexaMusic import LOGGER, YouTube, app
 from AlexaMusic.misc import db
+from AlexaMusic.platforms.youtube_helpers import duration_to_seconds
 from AlexaMusic.utils.database import (
     add_active_chat,
     add_active_video_chat,
-    get_assistant,
     get_audio_bitrate,
     get_lang,
     get_loop,
     get_video_bitrate,
     group_assistant,
-    is_autoend,
     music_on,
     remove_active_chat,
     remove_active_video_chat,
@@ -61,24 +56,19 @@ counter = {}
 AUTO_END_TIME = 1
 
 
-def _duration_to_seconds(duration) -> int:
-    if not duration:
-        return 0
-    try:
-        parts = [int(part) for part in str(duration).split(":")]
-    except (TypeError, ValueError):
-        return 0
-    total = 0
-    for part in parts:
-        total = total * 60 + part
-    return total
-
-
 async def _video_quality_for_duration(chat_id: int, duration=None):
     quality = await get_video_bitrate(chat_id)
     threshold = max(0, int(getattr(config, "LONG_VIDEO_THRESHOLD_MIN", 30))) * 60
-    if threshold and _duration_to_seconds(duration) >= threshold:
+    if threshold and duration_to_seconds(duration) >= threshold:
         cap = int(getattr(config, "LONG_VIDEO_MAX_QUALITY", 480))
+        LOGGER(__name__).info(
+            "Quality reduced to %sp because duration > configured threshold "
+            "chat_id=%s duration=%s threshold_minutes=%s",
+            cap,
+            chat_id,
+            duration,
+            config.LONG_VIDEO_THRESHOLD_MIN,
+        )
         if cap <= 360:
             return VideoQuality.SD_360p
         if cap <= 480:
@@ -89,40 +79,103 @@ async def _video_quality_for_duration(chat_id: int, duration=None):
     return quality
 
 
-def _youtube_ytdlp_parameters(link, use_cookies: bool = True) -> str | None:
-    if not isinstance(link, str):
-        return None
-    lowered = link.lower()
-    if "youtube.com/" not in lowered and "youtu.be/" not in lowered:
-        return None
-    if use_cookies:
-        return YouTube.ytdlp_parameters()
-    return "--no-playlist --no-warnings"
-
-
 def _media_stream(
+    link,
+    *,
+    audio_link=None,
+    audio_quality,
+    video_quality=None,
+    video=False,
+    image=None,
+):
+    kwargs = {
+        "audio_parameters": audio_quality,
+    }
+    if video:
+        kwargs["video_parameters"] = video_quality
+        if audio_link:
+            kwargs["audio_path"] = audio_link
+        return MediaStream(link, **kwargs)
+    if image and config.PRIVATE_BOT_MODE == str(True):
+        kwargs["video_parameters"] = video_quality
+        kwargs["audio_path"] = link
+        return MediaStream(image, **kwargs)
+    kwargs["video_flags"] = MediaStream.Flags.IGNORE
+    return MediaStream(link, **kwargs)
+
+
+def _quality_height(video_quality) -> int:
+    if hasattr(video_quality, "height"):
+        return int(video_quality.height)
+    values = getattr(video_quality, "value", ())
+    dimensions = [value for value in values[:2] if isinstance(value, int)]
+    return min(dimensions) if dimensions else 720
+
+
+async def _play_media_with_fallback(
+    player,
+    chat_id: int,
     link,
     *,
     audio_quality,
     video_quality=None,
     video=False,
     image=None,
-    use_cookies: bool = True,
+    group_config=None,
 ):
-    kwargs = {
-        "audio_parameters": audio_quality,
-    }
-    ytdlp_parameters = _youtube_ytdlp_parameters(link, use_cookies=use_cookies)
-    if ytdlp_parameters:
-        kwargs["ytdlp_parameters"] = ytdlp_parameters
-    if video:
-        kwargs["video_parameters"] = video_quality
-        return MediaStream(link, **kwargs)
-    if image and config.PRIVATE_BOT_MODE == str(True):
-        kwargs["video_parameters"] = video_quality
-        return MediaStream(link, image, **kwargs)
-    kwargs["video_flags"] = MediaStream.Flags.IGNORE
-    return MediaStream(link, **kwargs)
+    youtube = isinstance(link, str) and YouTube.is_youtube_url(link)
+    attempts = YouTube.stream_attempts() if youtube else (None,)
+    errors = []
+    for attempt in attempts:
+        stream_link = link
+        audio_link = None
+        if attempt is not None:
+            YouTube.log_attempt(attempt, operation="stream", chat_id=chat_id)
+            try:
+                stream_link, audio_link = await YouTube.resolve_stream(
+                    link,
+                    attempt,
+                    video=video,
+                    max_height=_quality_height(video_quality),
+                )
+            except Exception as error:
+                errors.append(error)
+                YouTube.log_failure(
+                    attempt,
+                    error,
+                    operation="stream",
+                    chat_id=chat_id,
+                )
+                continue
+        stream = _media_stream(
+            stream_link,
+            audio_link=audio_link,
+            audio_quality=audio_quality,
+            video_quality=video_quality,
+            video=video,
+            image=image,
+        )
+        try:
+            kwargs = {"config": group_config} if group_config is not None else {}
+            await player.play(chat_id, stream, **kwargs)
+            if youtube:
+                LOGGER(__name__).info(
+                    "Streaming directly from YouTube chat_id=%s strategy=%s",
+                    chat_id,
+                    attempt.strategy.value,
+                )
+            return
+        except YtDlpError as error:
+            if attempt is None:
+                raise
+            errors.append(error)
+            YouTube.log_failure(
+                attempt,
+                error,
+                operation="stream",
+                chat_id=chat_id,
+            )
+    raise AssistantErr(YouTube.friendly_error(errors[-1]))
 
 
 async def _clear_(chat_id):
@@ -303,50 +356,25 @@ class Call(PyTgCalls):
         ksk = GroupCallConfig(auto_start=False)
         audio_stream_quality = await get_audio_bitrate(chat_id)
         video_stream_quality = await _video_quality_for_duration(chat_id, duration)
-        stream = _media_stream(
-            link,
-            audio_quality=audio_stream_quality,
-            video_quality=video_stream_quality,
-            video=bool(video),
-            image=image,
-        )
 
         no_active_retried = False
-        anonymous_youtube_retry = False
         while True:
             try:
-                await assistant.play(chat_id, stream, config=ksk)
+                await _play_media_with_fallback(
+                    assistant,
+                    chat_id,
+                    link,
+                    audio_quality=audio_stream_quality,
+                    video_quality=video_stream_quality,
+                    video=bool(video),
+                    image=image,
+                    group_config=ksk,
+                )
                 break
             except ChatAdminRequired:
                 raise AssistantErr(
                     "الحساب المساعد لا يملك الصلاحيات اللازمة للانضمام إلى المحادثة الصوتية."
                 )
-            except YtDlpError as error:
-                error_text = str(error).lower()
-                is_bot_check = (
-                    "sign in to confirm you’re not a bot" in error_text
-                    or "sign in to confirm you're not a bot" in error_text
-                )
-                if (
-                    is_bot_check
-                    and _youtube_ytdlp_parameters(link)
-                    and not anonymous_youtube_retry
-                ):
-                    anonymous_youtube_retry = True
-                    LOGGER(__name__).warning(
-                        "YouTube rejected cookies for chat_id=%s; retrying the stream once without cookies.",
-                        chat_id,
-                    )
-                    stream = _media_stream(
-                        link,
-                        audio_quality=audio_stream_quality,
-                        video_quality=video_stream_quality,
-                        video=bool(video),
-                        image=image,
-                        use_cookies=False,
-                    )
-                    continue
-                raise AssistantErr(YouTube.friendly_error(error))
             except TelegramServerError:
                 raise AssistantErr(
                     "حدث خطأ من خوادم Telegram أثناء الانضمام للمحادثة الصوتية. حاول مرة أخرى بعد قليل."
@@ -405,7 +433,6 @@ class Call(PyTgCalls):
             language = await get_lang(chat_id)
             _ = get_string(language)
             title = (check[0]["title"]).title()
-            user = check[0]["by"]
             original_chat_id = check[0]["chat_id"]
             streamtype = check[0]["streamtype"]
             audio_stream_quality = await get_audio_bitrate(chat_id)
@@ -413,7 +440,6 @@ class Call(PyTgCalls):
                 chat_id, check[0].get("dur")
             )
             videoid = check[0]["vidid"]
-            userid = check[0].get("user_id")
             check[0]["played"] = 0
             video = str(streamtype) == "video"
             if "live_" in queued:
@@ -425,18 +451,19 @@ class Call(PyTgCalls):
                             image = await YouTube.thumbnail(videoid, True)
                         except Exception:
                             image = None
-                    stream = _media_stream(
+                    await _play_media_with_fallback(
+                        client,
+                        chat_id,
                         link,
                         audio_quality=audio_stream_quality,
                         video_quality=video_stream_quality,
                         video=video,
                         image=image,
                     )
-                    await client.play(chat_id, stream)
-                except YtDlpError as error:
+                except AssistantErr as error:
                     return await app.send_message(
                         original_chat_id,
-                        text=YouTube.friendly_error(error),
+                        text=str(error),
                     )
                 except Exception:
                     LOGGER(__name__).exception(
@@ -472,17 +499,18 @@ class Call(PyTgCalls):
                             image = await YouTube.thumbnail(videoid, True)
                         except Exception:
                             image = None
-                    stream = _media_stream(
+                    await _play_media_with_fallback(
+                        client,
+                        chat_id,
                         file_path,
                         audio_quality=audio_stream_quality,
                         video_quality=video_stream_quality,
                         video=video,
                         image=image,
                     )
-                    await client.play(chat_id, stream)
-                except YtDlpError as error:
+                except AssistantErr as error:
                     return await mystic.edit_text(
-                        YouTube.friendly_error(error),
+                        str(error),
                         disable_web_page_preview=True,
                     )
                 except Exception:
@@ -547,7 +575,7 @@ class Call(PyTgCalls):
                 else:
                     try:
                         image = await YouTube.thumbnail(videoid, True)
-                    except:
+                    except Exception:
                         image = None
                 if video:
                     stream = MediaStream(

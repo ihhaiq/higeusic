@@ -19,7 +19,13 @@ cleanup() {
 
 trap cleanup EXIT INT TERM
 
-if [ -d "${POT_HOME}/node_modules" ]; then
+POT_ENABLED="${YOUTUBE_POT_ENABLED:-true}"
+case "${POT_ENABLED}" in
+    1|true|TRUE|yes|YES|on|ON) POT_ENABLED=1 ;;
+    *) POT_ENABLED=0 ;;
+esac
+
+if [ "${POT_ENABLED}" -eq 1 ] && [ -d "${POT_HOME}/node_modules" ]; then
     (
         cd "${POT_HOME}/node_modules" || exit 1
         exec deno run \
@@ -49,8 +55,10 @@ if [ -d "${POT_HOME}/node_modules" ]; then
     if [ "${POT_READY}" -ne 1 ] && kill -0 "${POT_PID}" 2>/dev/null; then
         echo "[PO Token] provider did not become ready in time; continuing with normal yt-dlp fallbacks." >&2
     fi
-else
+elif [ "${POT_ENABLED}" -eq 1 ]; then
     echo "[PO Token] provider files are missing; continuing without local PO token generation." >&2
+else
+    echo "[PO Token] provider disabled by YOUTUBE_POT_ENABLED."
 fi
 
 python3 -m AlexaMusic &

@@ -12,7 +12,6 @@ as you want or you can collabe if you have new ideas.
 import os
 import re
 
-import yt_dlp
 from pyrogram import enums, filters
 from pyrogram.types import (
     InlineKeyboardButton,
@@ -22,12 +21,12 @@ from pyrogram.types import (
     Message,
 )
 
-from config import BANNED_USERS, SONG_DOWNLOAD_DURATION, SONG_DOWNLOAD_DURATION_LIMIT
-from strings import get_command
 from AlexaMusic import YouTube, app
 from AlexaMusic.utils.decorators.language import language, languageCB
 from AlexaMusic.utils.formatters import convert_bytes
 from AlexaMusic.utils.inline.song import song_markup
+from config import BANNED_USERS, SONG_DOWNLOAD_DURATION, SONG_DOWNLOAD_DURATION_LIMIT
+from strings import get_command
 
 # Command
 SONG_COMMAND = get_command("SONG_COMMAND")
@@ -216,10 +215,12 @@ async def song_download_cb(client, CallbackQuery, _):
     stype, format_id, vidid = callback_request.split("|")
     mystic = await CallbackQuery.edit_message_text(_["song_8"])
     yturl = f"https://www.youtube.com/watch?v={vidid}"
-    with yt_dlp.YoutubeDL({"quiet": True}) as ytdl:
-        x = ytdl.extract_info(yturl, download=False)
+    try:
+        x = await YouTube.info(yturl)
+    except Exception as error:
+        return await mystic.edit_text(YouTube.friendly_error(error))
     title = (x["title"]).title()
-    title = re.sub("\W+", " ", title)
+    title = re.sub(r"\W+", " ", title)
     thumb_image_path = await CallbackQuery.message.download()
     if stype == "video":
         thumb_image_path = await CallbackQuery.message.download()

@@ -13,7 +13,6 @@ import re
 
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
-from youtubesearchpython.__future__ import VideosSearch
 
 import config
 
@@ -40,24 +39,12 @@ class SpotifyAPI:
         track = self.spotify.track(link)
         info = track["name"]
         for artist in track["artists"]:
-            fetched = f' {artist["name"]}'
+            fetched = f" {artist['name']}"
             if "Various Artists" not in fetched:
                 info += fetched
-        results = VideosSearch(info, limit=1)
-        for result in (await results.next())["result"]:
-            ytlink = result["link"]
-            title = result["title"]
-            vidid = result["id"]
-            duration_min = result["duration"]
-            thumbnail = result["thumbnails"][0]["url"].split("?")[0]
-        track_details = {
-            "title": title,
-            "link": ytlink,
-            "vidid": vidid,
-            "duration_min": duration_min,
-            "thumb": thumbnail,
-        }
-        return track_details, vidid
+        from AlexaMusic import YouTube
+
+        return await YouTube.track(info)
 
     async def playlist(self, url):
         playlist = self.spotify.playlist(url)
@@ -67,7 +54,7 @@ class SpotifyAPI:
             music_track = item["track"]
             info = music_track["name"]
             for artist in music_track["artists"]:
-                fetched = f' {artist["name"]}'
+                fetched = f" {artist['name']}"
                 if "Various Artists" not in fetched:
                     info += fetched
             results.append(info)
@@ -80,7 +67,7 @@ class SpotifyAPI:
         for item in album["tracks"]["items"]:
             info = item["name"]
             for artist in item["artists"]:
-                fetched = f' {artist["name"]}'
+                fetched = f" {artist['name']}"
                 if "Various Artists" not in fetched:
                     info += fetched
             results.append(info)
@@ -98,7 +85,7 @@ class SpotifyAPI:
         for item in artisttoptracks["tracks"]:
             info = item["name"]
             for artist in item["artists"]:
-                fetched = f' {artist["name"]}'
+                fetched = f" {artist['name']}"
                 if "Various Artists" not in fetched:
                     info += fetched
             results.append(info)
