@@ -79,7 +79,7 @@ class Call(PyTgCalls):
         )
         self.one = PyTgCalls(
             self.userbot1,
-            cache_duration=100,
+            cache_duration=2,
         )
         self.userbot2 = Client(
             name="Alexa2",
@@ -89,7 +89,7 @@ class Call(PyTgCalls):
         )
         self.two = PyTgCalls(
             self.userbot2,
-            cache_duration=100,
+            cache_duration=2,
         )
         self.userbot3 = Client(
             name="Alexa3",
@@ -99,7 +99,7 @@ class Call(PyTgCalls):
         )
         self.three = PyTgCalls(
             self.userbot3,
-            cache_duration=100,
+            cache_duration=2,
         )
         self.userbot4 = Client(
             name="Alexa4",
@@ -109,7 +109,7 @@ class Call(PyTgCalls):
         )
         self.four = PyTgCalls(
             self.userbot4,
-            cache_duration=100,
+            cache_duration=2,
         )
         self.userbot5 = Client(
             name="Alexa5",
@@ -119,7 +119,7 @@ class Call(PyTgCalls):
         )
         self.five = PyTgCalls(
             self.userbot5,
-            cache_duration=100,
+            cache_duration=2,
         )
 
     async def pause_stream(self, chat_id: int):
@@ -269,13 +269,32 @@ class Call(PyTgCalls):
             await assistant.play(chat_id, stream, config=ksk)
         except ChatAdminRequired:
             raise AssistantErr(
-                "<b>𝖭𝗈 𝖠𝖼𝗍𝗂𝗏𝖾 𝖵𝗂𝖽𝖾𝗈𝖢𝗁𝖺𝗍 𝖥𝗈𝗎𝗇𝖽 .</b>\n\n𝖳𝗋𝗒 𝖺𝖿𝗍𝖾𝗋 𝗀𝗂𝗏𝗂𝗇𝗀 𝖢𝗁𝖺𝗍 𝖠𝖽𝗆𝗂𝗇 𝗆𝖾."
+                "الحساب المساعد لا يملك الصلاحيات اللازمة للانضمام إلى المحادثة الصوتية."
             )
         except NoActiveGroupCall:
-            raise AssistantErr("<b>𝖲𝗍𝖺𝗋𝗍 𝖵𝗂𝖽𝖾𝗈 𝖢𝗁𝖺𝗍.<b>\n\n𝖳𝗁𝖾𝗇 𝖳𝗋𝗒 𝖯𝗅𝖺𝗒𝗂𝗇𝗀 𝖲𝗈𝗇𝗀𝗌.")
+            # PyTgCalls caches get_full_chat results. A voice chat that was
+            # started moments ago can therefore look inactive briefly.
+            LOGGER(__name__).warning(
+                "لم يكتشف PyTgCalls المحادثة الصوتية في %s من المحاولة الأولى؛ "
+                "سنعيد الفحص بعد انتهاء الكاش القصير.",
+                chat_id,
+            )
+            await asyncio.sleep(3)
+            try:
+                await assistant.play(chat_id, stream, config=ksk)
+            except NoActiveGroupCall:
+                LOGGER(__name__).warning(
+                    "لم يتم العثور على محادثة صوتية فعالة بعد إعادة الفحص: chat_id=%s",
+                    chat_id,
+                )
+                raise AssistantErr(
+                    "المحادثة الصوتية تبدو مفتوحة، لكن الحساب المساعد لا يستطيع رؤيتها. "
+                    "تأكد أن الاتصال مفتوح في نفس المجموعة/القناة التي أرسلت فيها أمر التشغيل "
+                    "وأن الحساب المساعد عضو فيها، ثم حاول مرة أخرى."
+                )
         except TelegramServerError:
             raise AssistantErr(
-                "<b>𝖳𝖾𝗅𝖾𝗀𝗋𝖺𝗆 𝖲𝖾𝗋𝗏𝖾𝗋 𝖤𝗋𝗋𝗈𝗋</b>\n\n𝖳𝖾𝗅𝖾𝗀𝗋𝖺𝗆 𝖨𝗌 𝖧𝖺𝗏𝗂𝗇𝗀 𝖲𝗈𝗆𝖾 𝖨𝗇𝗍𝖾𝗋𝗇𝖺𝗅 𝖯𝗋𝗈𝖻𝗅𝖾𝗆𝗌 , 𝖯𝗅𝖾𝖺𝗌𝖾 𝖳𝗋𝗒 𝖯𝗅𝖺𝗒𝗂𝗇𝗀 𝖠𝗀𝖺𝗂𝗇 𝖮𝗋 𝖱𝖾𝗌𝗍𝖺𝗋𝗍 𝖳𝗁𝖾 𝖵𝗂𝖽𝖾𝗈𝖢𝗁𝖺𝗍 𝖮𝖿 𝖸𝗈𝗎𝗋 𝖦𝗋𝗈𝗎𝗉."
+                "حدث خطأ من خوادم Telegram أثناء الانضمام للمحادثة الصوتية. حاول مرة أخرى بعد قليل."
             )
         await add_active_chat(chat_id)
         await music_on(chat_id)
