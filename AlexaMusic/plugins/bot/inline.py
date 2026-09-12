@@ -14,11 +14,10 @@ from pyrogram.types import (
     InlineKeyboardMarkup,
     InlineQueryResultPhoto,
 )
-from youtubesearchpython.__future__ import VideosSearch
 
-from config import BANNED_USERS, MUSIC_BOT_NAME
-from AlexaMusic import app
+from AlexaMusic import YouTube, app
 from AlexaMusic.utils.inlinequery import answer
+from config import BANNED_USERS, MUSIC_BOT_NAME
 
 
 @app.on_inline_query(~BANNED_USERS)
@@ -30,18 +29,37 @@ async def inline_query_handler(client, query):
         except Exception:
             return
     else:
-        a = VideosSearch(text, limit=20)
-        result = (await a.next()).get("result")
+        try:
+            result = await YouTube.search_many(text, limit=15)
+        except Exception:
+            return
         answers = []
-        for x in range(15):
-            title = (result[x]["title"]).title()
-            duration = result[x]["duration"]
-            views = result[x]["viewCount"]["short"]
-            thumbnail = result[x]["thumbnails"][0]["url"].split("?")[0]
-            channellink = result[x]["channel"]["link"]
-            channel = result[x]["channel"]["name"]
-            link = result[x]["link"]
-            published = result[x]["publishedTime"]
+        for item in result:
+            title = (item.get("title") or "Unknown title").title()
+            duration_seconds = int(item.get("duration") or 0)
+            duration = (
+                f"{duration_seconds // 60}:{duration_seconds % 60:02d}"
+                if duration_seconds
+                else "Live"
+            )
+            views = f"{int(item.get('view_count') or 0):,}"
+            thumbnails = item.get("thumbnails") or []
+            thumbnail = item.get("thumbnail") or (
+                thumbnails[-1].get("url") if thumbnails else None
+            )
+            if not thumbnail:
+                continue
+            channellink = (
+                item.get("channel_url")
+                or item.get("uploader_url")
+                or "https://youtube.com"
+            )
+            channel = item.get("channel") or item.get("uploader") or "Unknown"
+            link = (
+                item.get("webpage_url")
+                or f"https://www.youtube.com/watch?v={item['id']}"
+            )
+            published = item.get("upload_date") or "Unknown"
             description = f"{views} | {duration} Mins | {channel}  | {published}"
             buttons = InlineKeyboardMarkup(
                 [

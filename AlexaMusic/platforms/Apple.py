@@ -14,7 +14,6 @@ from typing import Union
 
 import aiohttp
 from bs4 import BeautifulSoup
-from youtubesearchpython.__future__ import VideosSearch
 
 
 class AppleAPI:
@@ -40,21 +39,9 @@ class AppleAPI:
                 search = tag.get("content", None)
         if search is None:
             return False
-        results = VideosSearch(search, limit=1)
-        for result in (await results.next())["result"]:
-            title = result["title"]
-            ytlink = result["link"]
-            vidid = result["id"]
-            duration_min = result["duration"]
-            thumbnail = result["thumbnails"][0]["url"].split("?")[0]
-        track_details = {
-            "title": title,
-            "link": ytlink,
-            "vidid": vidid,
-            "duration_min": duration_min,
-            "thumb": thumbnail,
-        }
-        return track_details, vidid
+        from AlexaMusic import YouTube
+
+        return await YouTube.track(search)
 
     async def playlist(self, url, playid: Union[bool, str] = None):
         if playid:
