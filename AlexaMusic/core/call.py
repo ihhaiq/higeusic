@@ -504,19 +504,21 @@ class Call(PyTgCalls):
                         text=_["call_9"],
                     )
                 if videoid == "telegram":
-                    button = telegram_markup(_, chat_id)
-                    run = await app.send_photo(
+                    requester_id = check[0].get("user_id") or config.OWNER_ID
+                    run = await send_stream_rich_message(
                         original_chat_id,
-                        photo=(
+                        image=(
                             config.TELEGRAM_AUDIO_URL
                             if str(streamtype) == "audio"
                             else config.TELEGRAM_VIDEO_URL
                         ),
-                        caption=_["stream_3"].format(title, check[0]["dur"], user),
-                        reply_markup=InlineKeyboardMarkup(button),
+                        title=title,
+                        is_video=str(streamtype) == "video",
+                        requester_id=requester_id,
+                        duration=check[0]["dur"],
                     )
                     db[chat_id][0]["mystic"] = run
-                    db[chat_id][0]["markup"] = "tg"
+                    db[chat_id][0]["markup"] = "rich"
                 elif videoid == "soundcloud":
                     button = telegram_markup(_, chat_id)
                     run = await app.send_photo(
