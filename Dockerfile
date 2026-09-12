@@ -1,11 +1,15 @@
 FROM python:3.12-slim
 
+ARG BGUTIL_VERSION=2.0.0
+
 RUN apt-get update -y && \
     apt-get install -y --no-install-recommends \
     build-essential \
     ffmpeg \
     unzip \
-    curl && \
+    curl \
+    git \
+    ca-certificates && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
     curl -fsSL https://deno.land/install.sh | sh
@@ -13,9 +17,17 @@ RUN apt-get update -y && \
 ENV DENO_INSTALL="/root/.deno"
 ENV PATH="${DENO_INSTALL}/bin:${PATH}"
 
+# Native HTTP PO-token provider. It stays bound to localhost and is started
+# by ./start alongside the music bot.
+RUN git clone --depth 1 --branch "${BGUTIL_VERSION}" \
+    https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git \
+    /opt/bgutil-ytdlp-pot-provider && \
+    cd /opt/bgutil-ytdlp-pot-provider/server && \
+    deno install --allow-scripts=npm:canvas --frozen
+
 WORKDIR /app
 
-COPY requirements.txt ./ 
+COPY requirements.txt ./
 
 RUN python3.12 -m pip install --upgrade pip && \
     python3.12 -m pip install --no-cache-dir --prefer-binary -r requirements.txt
