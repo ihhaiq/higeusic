@@ -380,39 +380,33 @@ class Call(PyTgCalls):
             check[0]["played"] = 0
             video = str(streamtype) == "video"
             if "live_" in queued:
-                n, link = await YouTube.video(videoid, True)
-                if n == 0:
+                link = f"https://www.youtube.com/watch?v={videoid}"
+                try:
+                    image = None
+                    if not video:
+                        try:
+                            image = await YouTube.thumbnail(videoid, True)
+                        except Exception:
+                            image = None
+                    stream = _media_stream(
+                        link,
+                        audio_quality=audio_stream_quality,
+                        video_quality=video_stream_quality,
+                        video=video,
+                        image=image,
+                    )
+                    await client.play(chat_id, stream)
+                except YtDlpError as error:
                     return await app.send_message(
                         original_chat_id,
-                        text=_["call_9"],
+                        text=YouTube.friendly_error(error),
                     )
-                if video:
-                    stream = MediaStream(
-                        link,
-                        audio_parameters=audio_stream_quality,
-                        video_parameters=video_stream_quality,
-                    )
-                else:
-                    try:
-                        image = await YouTube.thumbnail(videoid, True)
-                    except Exception:
-                        image = None
-                    if image and config.PRIVATE_BOT_MODE == str(True):
-                        stream = MediaStream(
-                            link,
-                            image,
-                            audio_parameters=audio_stream_quality,
-                            video_parameters=video_stream_quality,
-                        )
-                    else:
-                        stream = MediaStream(
-                            link,
-                            audio_parameters=audio_stream_quality,
-                            video_flags=MediaStream.Flags.IGNORE,
-                        )
-                try:
-                    await client.play(chat_id, stream)
                 except Exception:
+                    LOGGER(__name__).exception(
+                        "فشل تشغيل بث YouTube مباشر من قائمة الانتظار: chat_id=%s video_id=%s",
+                        chat_id,
+                        videoid,
+                    )
                     return await app.send_message(
                         original_chat_id,
                         text=_["call_9"],
