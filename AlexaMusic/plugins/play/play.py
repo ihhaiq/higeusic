@@ -19,6 +19,7 @@ from pytgcalls.exceptions import NoActiveGroupCall
 import config
 from AlexaMusic import Apple, Resso, SoundCloud, Spotify, Telegram, YouTube, app
 from AlexaMusic.core.call import Alexa
+from AlexaMusic.logging import LOGGER
 from AlexaMusic.utils import seconds_to_min, time_to_seconds
 from AlexaMusic.utils.channelplay import get_channeplayCB
 from AlexaMusic.utils.database import is_video_allowed
@@ -172,8 +173,8 @@ async def play_commnd(
                         config.PLAYLIST_FETCH_LIMIT,
                         user_id,
                     )
-                except Exception as e:
-                    print(e)
+                except Exception:
+                    LOGGER(__name__).exception("فشل جلب معلومات مقطع YouTube من الرابط.")
                     return await mystic.edit_text(_["play_3"])
                 streamtype = "playlist"
                 plist_type = "yt"
@@ -344,6 +345,7 @@ async def play_commnd(
         try:
             details, track_id = await YouTube.track(query)
         except Exception:
+            LOGGER(__name__).exception("فشل البحث عن معلومات المقطع في YouTube.")
             return await mystic.edit_text(_["play_3"])
         streamtype = "youtube"
     if str(playmode) == "Direct":
