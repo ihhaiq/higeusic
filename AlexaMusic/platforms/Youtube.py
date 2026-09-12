@@ -69,6 +69,8 @@ class YouTubeAPI:
             return [
                 "--extractor-args",
                 f"youtubepot-bgutilhttp:base_url={config.YOUTUBE_POT_PROVIDER_URL}",
+                "--extractor-args",
+                "youtube:player-client=mweb",
             ]
         args = ["--no-plugin-dirs"]
         path = cookiefile()
