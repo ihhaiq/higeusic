@@ -89,20 +89,30 @@ async def _video_quality_for_duration(chat_id: int, duration=None):
     return quality
 
 
-def _youtube_ytdlp_parameters(link) -> str | None:
+def _youtube_ytdlp_parameters(link, use_cookies: bool = True) -> str | None:
     if not isinstance(link, str):
         return None
     lowered = link.lower()
     if "youtube.com/" not in lowered and "youtu.be/" not in lowered:
         return None
-    return YouTube.ytdlp_parameters()
+    if use_cookies:
+        return YouTube.ytdlp_parameters()
+    return "--no-playlist --no-warnings"
 
 
-def _media_stream(link, *, audio_quality, video_quality=None, video=False, image=None):
+def _media_stream(
+    link,
+    *,
+    audio_quality,
+    video_quality=None,
+    video=False,
+    image=None,
+    use_cookies: bool = True,
+):
     kwargs = {
         "audio_parameters": audio_quality,
     }
-    ytdlp_parameters = _youtube_ytdlp_parameters(link)
+    ytdlp_parameters = _youtube_ytdlp_parameters(link, use_cookies=use_cookies)
     if ytdlp_parameters:
         kwargs["ytdlp_parameters"] = ytdlp_parameters
     if video:
@@ -301,7 +311,9 @@ class Call(PyTgCalls):
             image=image,
         )
 
-        for attempt in range(2):
+        no_active_retried = False
+        anonymous_youtube_retry = False
+        while True:
             try:
                 await assistant.play(chat_id, stream, config=ksk)
                 break
@@ -310,13 +322,37 @@ class Call(PyTgCalls):
                     "الحساب المساعد لا يملك الصلاحيات اللازمة للانضمام إلى المحادثة الصوتية."
                 )
             except YtDlpError as error:
+                error_text = str(error).lower()
+                is_bot_check = (
+                    "sign in to confirm you’re not a bot" in error_text
+                    or "sign in to confirm you're not a bot" in error_text
+                )
+                if (
+                    is_bot_check
+                    and _youtube_ytdlp_parameters(link)
+                    and not anonymous_youtube_retry
+                ):
+                    anonymous_youtube_retry = True
+                    LOGGER(__name__).warning(
+                        "YouTube rejected cookies for chat_id=%s; retrying the stream once without cookies.",
+                        chat_id,
+                    )
+                    stream = _media_stream(
+                        link,
+                        audio_quality=audio_stream_quality,
+                        video_quality=video_stream_quality,
+                        video=bool(video),
+                        image=image,
+                        use_cookies=False,
+                    )
+                    continue
                 raise AssistantErr(YouTube.friendly_error(error))
             except TelegramServerError:
                 raise AssistantErr(
                     "حدث خطأ من خوادم Telegram أثناء الانضمام للمحادثة الصوتية. حاول مرة أخرى بعد قليل."
                 )
             except NoActiveGroupCall:
-                if attempt == 1:
+                if no_active_retried:
                     LOGGER(__name__).warning(
                         "لم يتم العثور على محادثة صوتية فعالة بعد إعادة الفحص: chat_id=%s",
                         chat_id,
@@ -326,6 +362,7 @@ class Call(PyTgCalls):
                         "تأكد أن الاتصال مفتوح في نفس المجموعة/القناة التي أرسلت فيها أمر التشغيل "
                         "وأن الحساب المساعد عضو فيها، ثم حاول مرة أخرى."
                     )
+                no_active_retried = True
                 LOGGER(__name__).warning(
                     "لم يكتشف PyTgCalls المحادثة الصوتية في %s من المحاولة الأولى؛ "
                     "سنعيد الفحص بعد انتهاء الكاش القصير.",
