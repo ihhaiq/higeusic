@@ -102,8 +102,10 @@ def _media_stream(
         if strict:
             kwargs["audio_flags"] = MediaStream.Flags.REQUIRED
             kwargs["video_flags"] = MediaStream.Flags.REQUIRED
-        if audio_link:
-            kwargs["audio_path"] = audio_link
+        # Always give PyTgCalls an explicit audio input for video playback.
+        # For progressive YouTube formats this is the same A/V URL; for DASH
+        # formats it is the separately resolved audio URL.
+        kwargs["audio_path"] = audio_link or link
         return MediaStream(link, **kwargs)
     if image and config.PRIVATE_BOT_MODE == str(True):
         kwargs["video_parameters"] = video_quality

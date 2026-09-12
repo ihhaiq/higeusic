@@ -339,33 +339,82 @@ class YouTubeAPI:
         video: bool,
         max_height: int = 720,
     ) -> tuple[str, str | None]:
-        """Resolve expiring Google video URLs for one isolated auth attempt."""
-        if video:
-            height = max(144, int(max_height or 720))
-            selector = (
-                f"bestvideo[vcodec~='(vp09|avc1)'][height<={height}]+bestaudio[ext=m4a]/"
-                f"bestvideo[height<={height}]+bestaudio/"
-                f"best[height<={height}]/best"
-            )
-        else:
-            selector = "bestaudio/best"
-        args = [
-            "--ignore-config",
-            "--no-warnings",
-            *self._attempt_args(attempt),
-            "--no-playlist",
-            "-g",
-            "-f",
-            selector,
-            link,
-        ]
-        output, _ = await self._run_process(args)
-        urls = [line.strip() for line in output.splitlines() if line.strip()]
-        if not urls:
-            raise RuntimeError("yt-dlp returned no playable stream URL")
+        """Resolve expiring Google media URLs for one isolated auth attempt.
+
+        Video playback prefers a single progressive stream containing both
+        audio and video.  PyTgCalls can then read both tracks from the same
+        input, which is more reliable than two independent Googlevideo URLs.
+        If YouTube does not expose a muxed format, fall back to an explicit
+        video-only + audio-only pair.  A video-only URL is never accepted as
+        a successful video result.
+        """
+        attempt_args = self._attempt_args(attempt)
+
         if not video:
+            args = [
+                "--ignore-config",
+                "--no-warnings",
+                *attempt_args,
+                "--no-playlist",
+                "-g",
+                "-f",
+                "bestaudio/best",
+                link,
+            ]
+            output, _ = await self._run_process(args)
+            urls = [line.strip() for line in output.splitlines() if line.strip()]
+            if not urls:
+                raise RuntimeError("yt-dlp returned no playable audio stream URL")
             return urls[0], None
-        return urls[0], urls[1] if len(urls) > 1 else None
+
+        height = max(144, int(max_height or 720))
+        selectors = (
+            (
+                f"best[acodec!=none][vcodec!=none][height<={height}]/"
+                "best[acodec!=none][vcodec!=none]"
+            ),
+            (
+                f"bestvideo[vcodec~='(vp09|avc1)'][height<={height}]"
+                "+bestaudio[ext=m4a]/"
+                f"bestvideo[height<={height}]+bestaudio"
+            ),
+        )
+        errors: list[Exception] = []
+
+        for selector in selectors:
+            args = [
+                "--ignore-config",
+                "--no-warnings",
+                *attempt_args,
+                "--no-playlist",
+                "-g",
+                "-f",
+                selector,
+                link,
+            ]
+            try:
+                output, _ = await self._run_process(args)
+            except Exception as error:
+                errors.append(error)
+                continue
+
+            urls = [line.strip() for line in output.splitlines() if line.strip()]
+            if len(urls) == 1:
+                LOGGER(__name__).info(
+                    "Resolved YouTube video as a combined audio/video stream"
+                )
+                return urls[0], None
+            if len(urls) >= 2:
+                LOGGER(__name__).info(
+                    "Resolved YouTube video as separate video + audio streams"
+                )
+                return urls[0], urls[1]
+
+            errors.append(RuntimeError("yt-dlp returned no playable video stream URL"))
+
+        if errors:
+            raise errors[-1]
+        raise RuntimeError("yt-dlp returned no playable video stream URL")
 
     async def playlist(self, link, limit, user_id, videoid: Union[bool, str] = None):
         if videoid:
