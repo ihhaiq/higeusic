@@ -24,6 +24,7 @@ from AlexaMusic.misc import sudo
 from AlexaMusic.plugins import ALL_MODULES
 from AlexaMusic.utils.database import get_banned_users, get_gbanned
 from AlexaMusic.core.cookies import save_cookies
+from AlexaMusic.core.rich_callbacks import run_rich_callback_polling
 
 
 async def init() -> None:
@@ -44,6 +45,12 @@ async def init() -> None:
     for module in ALL_MODULES:
         importlib.import_module(f"AlexaMusic.plugins{module}")
     LOGGER("AlexaMusic.plugins").info("Necessary Modules Imported Successfully.")
+
+    rich_callback_task = asyncio.create_task(
+        run_rich_callback_polling(),
+        name="rich-callback-polling",
+    )
+
     assistant_started = False
     try:
         await userbot.start()
@@ -77,6 +84,13 @@ async def init() -> None:
         )
 
     await idle()
+
+    rich_callback_task.cancel()
+    try:
+        await rich_callback_task
+    except asyncio.CancelledError:
+        pass
+
     await app.stop()
     if assistant_started:
         await userbot.stop()
