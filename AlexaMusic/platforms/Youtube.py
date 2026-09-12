@@ -26,13 +26,8 @@ from AlexaMusic.utils.formatters import seconds_to_min, time_to_seconds
 
 
 def cookiefile():
-    cookie_dir = "cookies"
-    if not os.path.isdir(cookie_dir):
-        return None
-    cookies_files = [f for f in os.listdir(cookie_dir) if f.endswith(".txt")]
-    if not cookies_files:
-        return None
-    return os.path.join(cookie_dir, cookies_files[0])
+    path = os.path.join("cookies", "cookies.txt")
+    return path if os.path.isfile(path) and os.path.getsize(path) > 0 else None
 
 
 def cookie_args():
