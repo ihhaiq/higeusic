@@ -20,24 +20,25 @@ from pyrogram.errors import (
 )
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-from config import PLAYLIST_IMG_URL, PRIVATE_BOT_MODE, OWNER_ID, adminlist
-from AlexaMusic.misc import db
-from strings import get_string
 from AlexaMusic import YouTube, app
+from AlexaMusic.logging import LOGGER
 from AlexaMusic.misc import SUDOERS
 from AlexaMusic.utils.database import (
+    get_assistant,
     get_cmode,
     get_lang,
     get_playmode,
-    get_assistant,
     get_playtype,
     is_active_chat,
     is_commanddelete_on,
     is_served_private_chat,
 )
 from AlexaMusic.utils.database.memorydatabase import is_maintenance
-from AlexaMusic.utils.inline.playlist import botplaylist_markup
 from AlexaMusic.utils.exceptions import AssistantErr
+from AlexaMusic.utils.inline.playlist import botplaylist_markup
+from AlexaMusic.utils.play_request import is_video_request, play_command_name
+from config import OWNER_ID, PLAYLIST_IMG_URL, PRIVATE_BOT_MODE, adminlist
+from strings import get_string
 
 links = {}
 
@@ -128,12 +129,16 @@ def PlayWrapper(command):
                 return await message.reply_text(_["admin_18"])
             if actor_id not in admins:
                 return await message.reply_text(_["play_4"])
-        command_name = message.command[0].lower()
-        video_commands = {"vplay", "cvplay", "vplayforce", "cvplayforce", "فيديو"}
-        video = True if command_name in video_commands else None
-        if message.text and "-v" in message.text:
-            video = True
-        if message.command[0][-1] == "e":
+        command_name = play_command_name(message)
+        video = True if is_video_request(message) else None
+        LOGGER(__name__).info(
+            "Play request parsed chat_id=%s command=%s mode=%s playmode=%s",
+            chat_id,
+            command_name,
+            "video" if video else "audio",
+            playmode,
+        )
+        if command_name.endswith("force"):
             if not await is_active_chat(chat_id):
                 return await message.reply_text(_["play_18"])
             fplay = True

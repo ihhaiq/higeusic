@@ -11,20 +11,18 @@ as you want or you can collabe if you have new ideas.
 
 import asyncio
 import importlib
-from typing import Any
 
 from pyrogram import idle
-from pytgcalls.exceptions import NoActiveGroupCall
 
 import config
-from config import BANNED_USERS
 from AlexaMusic import LOGGER, app, userbot
 from AlexaMusic.core.call import Alexa
+from AlexaMusic.core.cookies import save_cookies
+from AlexaMusic.core.rich_callbacks import run_rich_callback_polling
 from AlexaMusic.misc import sudo
 from AlexaMusic.plugins import ALL_MODULES
 from AlexaMusic.utils.database import get_banned_users, get_gbanned
-from AlexaMusic.core.cookies import save_cookies
-from AlexaMusic.core.rich_callbacks import run_rich_callback_polling
+from config import BANNED_USERS
 
 
 async def init() -> None:
@@ -61,17 +59,6 @@ async def init() -> None:
 
     if assistant_started:
         await Alexa.start()
-        try:
-            await Alexa.stream_call("https://telegra.ph/file/b60b80ccb06f7a48f68b5.mp4")
-        except NoActiveGroupCall:
-            LOGGER("AlexaMusic").warning(
-                "لم يتم العثور على محادثة صوتية فعالة أثناء فحص بدء التشغيل. "
-                "سيبقى البوت متصلاً؛ افتح محادثة صوتية قبل التشغيل."
-            )
-        except Exception as error:
-            LOGGER("AlexaMusic").warning(
-                "فشل فحص المكالمة عند بدء التشغيل: %s. سيبقى البوت متصلاً.", error
-            )
         await Alexa.decorators()
         LOGGER("AlexaMusic").info("تم تشغيل بوت الموسيقى بنجاح")
     else:

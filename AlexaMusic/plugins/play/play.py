@@ -37,7 +37,6 @@ from AlexaMusic.utils.logger import play_logs
 from AlexaMusic.utils.stream.stream import stream
 from config import BANNED_USERS, lyrical
 from strings import get_command
-from AlexaMusic.utils.database import is_served_user
 
 # Command
 PLAY_COMMAND = get_command("PLAY_COMMAND")
@@ -266,7 +265,7 @@ async def play_commnd(
         elif await Resso.valid(url):
             try:
                 details, track_id = await Resso.track(url)
-            except Exception as e:
+            except Exception:
                 return await mystic.edit_text(_["play_3"])
             streamtype = "youtube"
             img = details["thumb"]
@@ -352,7 +351,10 @@ async def play_commnd(
             )
             return await mystic.edit_text(YouTube.friendly_error(e))
         streamtype = "youtube"
-    if str(playmode) == "Direct":
+    # An explicit video command (/vplay, /cvplay or the Arabic "فيديو") must
+    # never be downgraded to the audio/video chooser, even when the chat uses
+    # button mode. The command itself is already an unambiguous choice.
+    if str(playmode) == "Direct" or video:
         if not plist_type:
             if details["duration_min"]:
                 duration_sec = time_to_seconds(details["duration_min"])
@@ -437,7 +439,7 @@ async def play_commnd(
                     ),
                     reply_markup=InlineKeyboardMarkup(buttons),
                 )
-                return await play_logs(message, streamtype=f"Searched on Youtube")
+                return await play_logs(message, streamtype="Searched on Youtube")
             else:
                 buttons = track_markup(
                     _,
@@ -452,7 +454,7 @@ async def play_commnd(
                     caption=cap,
                     reply_markup=InlineKeyboardMarkup(buttons),
                 )
-                return await play_logs(message, streamtype=f"URL Searched Inline")
+                return await play_logs(message, streamtype="URL Searched Inline")
 
 
 @app.on_callback_query(filters.regex("MusicStream") & ~BANNED_USERS)
