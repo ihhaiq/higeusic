@@ -18,7 +18,7 @@ def language(mystic):
     async def wrapper(_, message, **kwargs):
         if await is_maintenance() is False and message.from_user.id not in SUDOERS:
             return await message.reply_text(
-                "» ʙᴏᴛ ɪs ᴜɴᴅᴇʀ ᴍᴀɪɴᴛᴇɴᴀɴᴄᴇ ғᴏʀ sᴏᴍᴇ ᴛɪᴍᴇ, ᴩʟᴇᴀsᴇ ᴠɪsɪᴛ sᴜᴩᴩᴏʀᴛ ᴄʜᴀᴛ ᴛᴏ ᴋɴᴏᴡ ᴛʜᴇ ʀᴇᴀsᴏɴ."
+                "البوت في وضع الصيانة حالياً. يرجى المحاولة لاحقاً."
             )
         if await is_commanddelete_on(message.chat.id):
             try:
@@ -29,7 +29,7 @@ def language(mystic):
             language = await get_lang(message.chat.id)
             language = get_string(language)
         except Exception:
-            language = get_string("en")
+            language = get_string("ar")
         return await mystic(_, message, language)
 
     return wrapper
@@ -42,14 +42,14 @@ def languageCB(mystic):
             and CallbackQuery.from_user.id not in SUDOERS
         ):
             return await CallbackQuery.answer(
-                "» ʙᴏᴛ ɪs ᴜɴᴅᴇʀ ᴍᴀɪɴᴛᴇɴᴀɴᴄᴇ ғᴏʀ sᴏᴍᴇ ᴛɪᴍᴇ, ᴩʟᴇᴀsᴇ ᴠɪsɪᴛ sᴜᴩᴩᴏʀᴛ ᴄʜᴀᴛ ᴛᴏ ᴋɴᴏᴡ ᴛʜᴇ ʀᴇᴀsᴏɴ.",
+                "البوت في وضع الصيانة حالياً. يرجى المحاولة لاحقاً.",
                 show_alert=True,
             )
         try:
             language = await get_lang(CallbackQuery.message.chat.id)
             language = get_string(language)
         except Exception:
-            language = get_string("en")
+            language = get_string("ar")
         return await mystic(_, CallbackQuery, language)
 
     return wrapper
@@ -61,7 +61,7 @@ def LanguageStart(mystic):
             language = await get_lang(message.chat.id)
             language = get_string(language)
         except Exception:
-            language = get_string("en")
+            language = get_string("ar")
         return await mystic(_, message, language)
 
     return wrapper
