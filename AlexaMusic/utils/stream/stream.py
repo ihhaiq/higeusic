@@ -95,24 +95,19 @@ async def stream(
                 if not forceplay:
                     db[chat_id] = []
                 status = True if video else None
-                try:
-                    file_path, direct = await YouTube.download(
-                        vidid, mystic, video=status, videoid=True
-                    )
-                except Exception:
-                    LOGGER(__name__).exception(
-                        "فشل تجهيز ملف YouTube للبث: video=%s video_id=%s",
-                        bool(status),
-                        vidid,
-                    )
-                    raise AssistantErr(_["play_16"])
+                file_path = f"https://www.youtube.com/watch?v={vidid}"
                 await Alexa.join_call(
-                    chat_id, original_chat_id, file_path, video=status, image=thumbnail
+                    chat_id,
+                    original_chat_id,
+                    file_path,
+                    video=status,
+                    image=thumbnail,
+                    duration=duration_min,
                 )
                 await put_queue(
                     chat_id,
                     original_chat_id,
-                    file_path if direct else f"vid_{vidid}",
+                    f"vid_{vidid}",
                     title,
                     duration_min,
                     user_name,
@@ -154,22 +149,12 @@ async def stream(
         duration_min = result["duration_min"]
         thumbnail = result["thumb"]
         status = True if video else None
-        try:
-            file_path, direct = await YouTube.download(
-                vidid, mystic, videoid=True, video=status
-            )
-        except Exception:
-            LOGGER(__name__).exception(
-                "فشل تجهيز ملف YouTube للبث: video=%s video_id=%s",
-                bool(status),
-                vidid,
-            )
-            raise AssistantErr(_["play_16"])
+        file_path = link or f"https://www.youtube.com/watch?v={vidid}"
         if await is_active_chat(chat_id):
             await put_queue(
                 chat_id,
                 original_chat_id,
-                file_path if direct else f"vid_{vidid}",
+                f"vid_{vidid}",
                 title,
                 duration_min,
                 user_name,
@@ -193,12 +178,17 @@ async def stream(
             if not forceplay:
                 db[chat_id] = []
             await Alexa.join_call(
-                chat_id, original_chat_id, file_path, video=status, image=thumbnail
+                chat_id,
+                original_chat_id,
+                file_path,
+                video=status,
+                image=thumbnail,
+                duration=duration_min,
             )
             await put_queue(
                 chat_id,
                 original_chat_id,
-                file_path if direct else f"vid_{vidid}",
+                f"vid_{vidid}",
                 title,
                 duration_min,
                 user_name,
@@ -349,15 +339,14 @@ async def stream(
         else:
             if not forceplay:
                 db[chat_id] = []
-            n, file_path = await YouTube.video(link)
-            if n == 0:
-                raise AssistantErr(_["str_3"])
+            file_path = link
             await Alexa.join_call(
                 chat_id,
                 original_chat_id,
                 file_path,
                 video=status,
                 image=thumbnail or None,
+                duration=duration_min,
             )
             await put_queue(
                 chat_id,
