@@ -11,6 +11,7 @@ as you want or you can collabe if you have new ideas.
 
 import asyncio
 import contextlib
+import os
 from datetime import datetime, timedelta
 from typing import Union
 
@@ -19,7 +20,7 @@ from pyrogram.errors import FloodWait, ChatAdminRequired
 from pytgcalls import PyTgCalls
 from pytgcalls import filters as fl
 from ntgcalls import TelegramServerError
-from pytgcalls.exceptions import NoActiveGroupCall
+from pytgcalls.exceptions import NoActiveGroupCall, YtDlpError
 from pytgcalls.types import (
     ChatUpdate,
     MediaStream,
@@ -58,6 +59,60 @@ from strings import get_string
 autoend = {}
 counter = {}
 AUTO_END_TIME = 1
+
+
+def _duration_to_seconds(duration) -> int:
+    if not duration:
+        return 0
+    try:
+        parts = [int(part) for part in str(duration).split(":")]
+    except (TypeError, ValueError):
+        return 0
+    total = 0
+    for part in parts:
+        total = total * 60 + part
+    return total
+
+
+async def _video_quality_for_duration(chat_id: int, duration=None):
+    quality = await get_video_bitrate(chat_id)
+    threshold = max(0, int(getattr(config, "LONG_VIDEO_THRESHOLD_MIN", 30))) * 60
+    if threshold and _duration_to_seconds(duration) >= threshold:
+        cap = int(getattr(config, "LONG_VIDEO_MAX_QUALITY", 480))
+        if cap <= 360:
+            return VideoQuality.SD_360p
+        if cap <= 480:
+            return VideoQuality.SD_480p
+        if cap <= 720:
+            return VideoQuality.HD_720p
+        return VideoQuality.FHD_1080p
+    return quality
+
+
+def _youtube_ytdlp_parameters(link) -> str | None:
+    if not isinstance(link, str):
+        return None
+    lowered = link.lower()
+    if "youtube.com/" not in lowered and "youtu.be/" not in lowered:
+        return None
+    return YouTube.ytdlp_parameters()
+
+
+def _media_stream(link, *, audio_quality, video_quality=None, video=False, image=None):
+    kwargs = {
+        "audio_parameters": audio_quality,
+    }
+    ytdlp_parameters = _youtube_ytdlp_parameters(link)
+    if ytdlp_parameters:
+        kwargs["ytdlp_parameters"] = ytdlp_parameters
+    if video:
+        kwargs["video_parameters"] = video_quality
+        return MediaStream(link, **kwargs)
+    if image and config.PRIVATE_BOT_MODE == str(True):
+        kwargs["video_parameters"] = video_quality
+        return MediaStream(link, image, **kwargs)
+    kwargs["video_flags"] = MediaStream.Flags.IGNORE
+    return MediaStream(link, **kwargs)
 
 
 async def _clear_(chat_id):
@@ -232,70 +287,51 @@ class Call(PyTgCalls):
         link,
         video: Union[bool, str] = None,
         image: Union[bool, str] = None,
+        duration=None,
     ):
         assistant = await group_assistant(self, chat_id)
         ksk = GroupCallConfig(auto_start=False)
         audio_stream_quality = await get_audio_bitrate(chat_id)
-        video_stream_quality = await get_video_bitrate(chat_id)
-        if video:
-            stream = MediaStream(
-                link,
-                audio_parameters=audio_stream_quality,
-                video_parameters=video_stream_quality,
-            )
-        else:
-            if image and config.PRIVATE_BOT_MODE == str(True):
-                stream = MediaStream(
-                    link,
-                    image,
-                    audio_parameters=audio_stream_quality,
-                    video_parameters=video_stream_quality,
-                )
-            else:
-                stream = (
-                    MediaStream(
-                        link,
-                        audio_parameters=audio_stream_quality,
-                        video_parameters=video_stream_quality,
-                    )
-                    if video
-                    else MediaStream(
-                        link,
-                        audio_parameters=audio_stream_quality,
-                        video_flags=MediaStream.Flags.IGNORE,
-                    )
-                )
-        try:
-            await assistant.play(chat_id, stream, config=ksk)
-        except ChatAdminRequired:
-            raise AssistantErr(
-                "الحساب المساعد لا يملك الصلاحيات اللازمة للانضمام إلى المحادثة الصوتية."
-            )
-        except NoActiveGroupCall:
-            # PyTgCalls caches get_full_chat results. A voice chat that was
-            # started moments ago can therefore look inactive briefly.
-            LOGGER(__name__).warning(
-                "لم يكتشف PyTgCalls المحادثة الصوتية في %s من المحاولة الأولى؛ "
-                "سنعيد الفحص بعد انتهاء الكاش القصير.",
-                chat_id,
-            )
-            await asyncio.sleep(3)
+        video_stream_quality = await _video_quality_for_duration(chat_id, duration)
+        stream = _media_stream(
+            link,
+            audio_quality=audio_stream_quality,
+            video_quality=video_stream_quality,
+            video=bool(video),
+            image=image,
+        )
+
+        for attempt in range(2):
             try:
                 await assistant.play(chat_id, stream, config=ksk)
+                break
+            except ChatAdminRequired:
+                raise AssistantErr(
+                    "الحساب المساعد لا يملك الصلاحيات اللازمة للانضمام إلى المحادثة الصوتية."
+                )
+            except YtDlpError as error:
+                raise AssistantErr(YouTube.friendly_error(error))
+            except TelegramServerError:
+                raise AssistantErr(
+                    "حدث خطأ من خوادم Telegram أثناء الانضمام للمحادثة الصوتية. حاول مرة أخرى بعد قليل."
+                )
             except NoActiveGroupCall:
+                if attempt == 1:
+                    LOGGER(__name__).warning(
+                        "لم يتم العثور على محادثة صوتية فعالة بعد إعادة الفحص: chat_id=%s",
+                        chat_id,
+                    )
+                    raise AssistantErr(
+                        "المحادثة الصوتية تبدو مفتوحة، لكن الحساب المساعد لا يستطيع رؤيتها. "
+                        "تأكد أن الاتصال مفتوح في نفس المجموعة/القناة التي أرسلت فيها أمر التشغيل "
+                        "وأن الحساب المساعد عضو فيها، ثم حاول مرة أخرى."
+                    )
                 LOGGER(__name__).warning(
-                    "لم يتم العثور على محادثة صوتية فعالة بعد إعادة الفحص: chat_id=%s",
+                    "لم يكتشف PyTgCalls المحادثة الصوتية في %s من المحاولة الأولى؛ "
+                    "سنعيد الفحص بعد انتهاء الكاش القصير.",
                     chat_id,
                 )
-                raise AssistantErr(
-                    "المحادثة الصوتية تبدو مفتوحة، لكن الحساب المساعد لا يستطيع رؤيتها. "
-                    "تأكد أن الاتصال مفتوح في نفس المجموعة/القناة التي أرسلت فيها أمر التشغيل "
-                    "وأن الحساب المساعد عضو فيها، ثم حاول مرة أخرى."
-                )
-        except TelegramServerError:
-            raise AssistantErr(
-                "حدث خطأ من خوادم Telegram أثناء الانضمام للمحادثة الصوتية. حاول مرة أخرى بعد قليل."
-            )
+                await asyncio.sleep(3)
         await add_active_chat(chat_id)
         await music_on(chat_id)
         if video:
@@ -336,7 +372,9 @@ class Call(PyTgCalls):
             original_chat_id = check[0]["chat_id"]
             streamtype = check[0]["streamtype"]
             audio_stream_quality = await get_audio_bitrate(chat_id)
-            video_stream_quality = await get_video_bitrate(chat_id)
+            video_stream_quality = await _video_quality_for_duration(
+                chat_id, check[0].get("dur")
+            )
             videoid = check[0]["vidid"]
             userid = check[0].get("user_id")
             check[0]["played"] = 0
@@ -395,47 +433,35 @@ class Call(PyTgCalls):
                 db[chat_id][0]["markup"] = "rich"
             elif "vid_" in queued:
                 mystic = await app.send_message(original_chat_id, _["call_10"])
+                file_path = f"https://www.youtube.com/watch?v={videoid}"
                 try:
-                    file_path, direct = await YouTube.download(
-                        videoid,
-                        mystic,
-                        videoid=True,
-                        video=str(streamtype) == "video",
+                    image = None
+                    if not video:
+                        try:
+                            image = await YouTube.thumbnail(videoid, True)
+                        except Exception:
+                            image = None
+                    stream = _media_stream(
+                        file_path,
+                        audio_quality=audio_stream_quality,
+                        video_quality=video_stream_quality,
+                        video=video,
+                        image=image,
+                    )
+                    await client.play(chat_id, stream)
+                except YtDlpError as error:
+                    return await mystic.edit_text(
+                        YouTube.friendly_error(error),
+                        disable_web_page_preview=True,
                     )
                 except Exception:
+                    LOGGER(__name__).exception(
+                        "فشل تشغيل عنصر YouTube من قائمة الانتظار: chat_id=%s video_id=%s",
+                        chat_id,
+                        videoid,
+                    )
                     return await mystic.edit_text(
                         _["call_9"], disable_web_page_preview=True
-                    )
-                if video:
-                    stream = MediaStream(
-                        file_path,
-                        audio_parameters=audio_stream_quality,
-                        video_parameters=video_stream_quality,
-                    )
-                else:
-                    try:
-                        image = await YouTube.thumbnail(videoid, True)
-                    except:
-                        image = None
-                    if image and config.PRIVATE_BOT_MODE == str(True):
-                        stream = MediaStream(
-                            file_path,
-                            image,
-                            audio_parameters=audio_stream_quality,
-                            video_parameters=video_stream_quality,
-                        )
-                    else:
-                        stream = MediaStream(
-                            file_path,
-                            audio_parameters=audio_stream_quality,
-                            video_flags=MediaStream.Flags.IGNORE,
-                        )
-                try:
-                    await client.play(chat_id, stream)
-                except Exception:
-                    return await app.send_message(
-                        original_chat_id,
-                        text=_["call_9"],
                     )
                 # theme = await check_theme(chat_id)
                 img = await gen_thumb(videoid)
@@ -563,6 +589,15 @@ class Call(PyTgCalls):
                         )
                     except FloodWait as e:
                         await asyncio.sleep(e.value)
+                        run = await send_stream_rich_message(
+                            original_chat_id,
+                            image=img,
+                            title=title,
+                            is_video=str(streamtype) == "video",
+                            requester_id=requester_id,
+                            info_url=f"https://t.me/{app.username}?start=info_{videoid}",
+                            duration=check[0]["dur"],
+                        )
                     db[chat_id][0]["mystic"] = run
                     db[chat_id][0]["markup"] = "rich"
 
