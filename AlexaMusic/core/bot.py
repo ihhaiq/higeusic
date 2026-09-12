@@ -52,9 +52,7 @@ class AlexaBot(Client):
         self.id = get_me.id
         self.mention = get_me.mention
         try:
-            await self.send_message(
-                config.LOG_GROUP_ID, "✅ بدأ بوت الموسيقى، بانتظار تشغيل الحساب المساعد..."
-            )
+            await self.get_chat(config.LOG_GROUP_ID)
         except Exception:
             LOGGER(__name__).error(
                 "فشل البوت في الوصول إلى مجموعة السجل. أضف البوت إليها وارفعه مشرفاً."
