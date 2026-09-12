@@ -33,36 +33,36 @@ async def inline_query_handler(client, query):
         a = VideosSearch(text, limit=20)
         result = (await a.next()).get("result")
         answers = []
-        for x in range(15):
-            title = (result[x]["title"]).title()
-            duration = result[x]["duration"]
-            views = result[x]["viewCount"]["short"]
-            thumbnail = result[x]["thumbnails"][0]["url"].split("?")[0]
-            channellink = result[x]["channel"]["link"]
-            channel = result[x]["channel"]["name"]
-            link = result[x]["link"]
-            published = result[x]["publishedTime"]
-            description = f"{views} | {duration} Mins | {channel}  | {published}"
+        for item in result[:15]:
+            title = (item["title"]).title()
+            duration = item["duration"]
+            views = item["viewCount"]["short"]
+            thumbnail = item["thumbnails"][0]["url"].split("?")[0]
+            channellink = item["channel"]["link"]
+            channel = item["channel"]["name"]
+            link = item["link"]
+            published = item["publishedTime"]
+            description = f"{views} مشاهدة | {duration} | {channel} | {published}"
             buttons = InlineKeyboardMarkup(
                 [
                     [
                         InlineKeyboardButton(
-                            text="• ʏᴏᴜᴛᴜʙᴇ •",
+                            text="يوتيوب",
                             url=link,
                         )
                     ],
                 ]
             )
             searched_text = f"""
-📌**ᴛɪᴛʟᴇ:** [{title}]({link})
+📌 **العنوان:** [{title}]({link})
 
-⏳**ᴅᴜʀᴀᴛɪᴏɴ:** {duration} Mins
-👀**ᴠɪᴇᴡs:** `{views}`
-⏰**ᴩᴜʙʟɪsʜᴇᴅ ᴏɴ:** {published}
-🎥**ᴄʜᴀɴɴᴇʟ:** {channel}
-📎**ᴄʜᴀɴɴᴇʟ ʟɪɴᴋ:** [ᴠɪsɪᴛ ᴄʜᴀɴɴᴇʟ]({channellink})
+⏳ **المدة:** {duration}
+👀 **المشاهدات:** `{views}`
+⏰ **تاريخ النشر:** {published}
+🎥 **القناة:** {channel}
+📎 **رابط القناة:** [فتح القناة]({channellink})
 
-💖 ** sᴇᴀʀᴄʜ ᴩᴏᴡᴇʀᴇᴅ ʙʏ {MUSIC_BOT_NAME} **"""
+🔎 **البحث بواسطة {MUSIC_BOT_NAME}**"""
             answers.append(
                 InlineQueryResultPhoto(
                     photo_url=thumbnail,

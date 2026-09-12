@@ -21,7 +21,7 @@ from AlexaMusic.utils.decorators import ActualAdminCB, language, languageCB
 # Languages Available
 
 
-def lanuages_keyboard(_):
+def languages_keyboard(_):
     buttons = [
         InlineKeyboardButton(text=languages_present[i], callback_data=f"languages:{i}")
         for i in languages_present
@@ -45,7 +45,7 @@ LANGUAGE_COMMAND = get_command("LANGUAGE_COMMAND")
 @app.on_message(filters.command(LANGUAGE_COMMAND) & filters.group & ~BANNED_USERS)
 @language
 async def langs_command(client, message: Message, _):
-    keyboard = lanuages_keyboard(_)
+    keyboard = languages_keyboard(_)
     await message.reply_text(
         _["setting_1"].format(message.chat.title, message.chat.id),
         reply_markup=keyboard,
@@ -54,34 +54,34 @@ async def langs_command(client, message: Message, _):
 
 @app.on_callback_query(filters.regex("LG") & ~BANNED_USERS)
 @languageCB
-async def lanuagecb(client, CallbackQuery, _):
+async def language_cb(client, CallbackQuery, _):
     try:
         await CallbackQuery.answer()
     except Exception:
         pass
-    keyboard = lanuages_keyboard(_)
+    keyboard = languages_keyboard(_)
     return await CallbackQuery.edit_message_reply_markup(reply_markup=keyboard)
 
 
 @app.on_callback_query(filters.regex(r"languages:(.*?)") & ~BANNED_USERS)
 @ActualAdminCB
 async def language_markup(client, CallbackQuery, _):
-    langauge = CallbackQuery.data.split(":")[1]
+    language_code = CallbackQuery.data.split(":", 1)[1]
     old = await get_lang(CallbackQuery.message.chat.id)
-    if str(old) == str(langauge):
+    if str(old) == str(language_code):
         return await CallbackQuery.answer(
-            "ʏᴏᴜ'ʀᴇ ᴀʟʀᴇᴀᴅʏ ᴜsɪɴɢ sᴀᴍᴇ ʟᴀɴɢᴜᴀɢᴇ ғᴏʀ ᴛʜɪs ᴄʜᴀᴛ.", show_alert=True
+            "هذه اللغة مستخدمة بالفعل في هذه المحادثة.", show_alert=True
         )
     try:
-        _ = get_string(langauge)
+        _ = get_string(language_code)
         await CallbackQuery.answer(
-            "sᴜᴄᴄᴇssғᴜʟʟʏ ᴄʜᴀɴɢᴇᴅ ʏᴏᴜʀ ʟᴀɴɢᴜᴀɢᴇ.", show_alert=True
+            "تم تغيير لغة المحادثة بنجاح.", show_alert=True
         )
     except Exception:
         return await CallbackQuery.answer(
-            "ғᴀɪʟᴇᴅ ᴛᴏ ᴄʜᴀɴɢᴇ ʟᴀɴɢᴜᴀɢᴇ ᴏʀ ᴛʜᴇ ʟᴀɴɢᴜᴀɢᴇ ɪs ᴜɴᴅᴇʀ ᴍᴀɪɴᴛᴇɴᴀɴᴄᴇ.",
+            "تعذر تغيير اللغة أو أن ملف اللغة غير صالح.",
             show_alert=True,
         )
-    await set_lang(CallbackQuery.message.chat.id, langauge)
-    keyboard = lanuages_keyboard(_)
+    await set_lang(CallbackQuery.message.chat.id, language_code)
+    keyboard = languages_keyboard(_)
     return await CallbackQuery.edit_message_reply_markup(reply_markup=keyboard)

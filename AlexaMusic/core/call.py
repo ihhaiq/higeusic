@@ -396,7 +396,7 @@ class Call(PyTgCalls):
                 else:
                     try:
                         image = await YouTube.thumbnail(videoid, True)
-                    except:
+                    except Exception:
                         image = None
                     if image and config.PRIVATE_BOT_MODE == str(True):
                         stream = MediaStream(
@@ -471,7 +471,7 @@ class Call(PyTgCalls):
                 else:
                     try:
                         image = await YouTube.thumbnail(videoid, True)
-                    except:
+                    except Exception:
                         image = None
                 if video:
                     stream = MediaStream(
