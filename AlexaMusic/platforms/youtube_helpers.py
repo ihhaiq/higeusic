@@ -169,6 +169,11 @@ def classify_youtube_error(error: object) -> str:
         for marker in ("video unavailable", "not available in your country")
     ):
         return "unavailable"
+    if any(
+        marker in text
+        for marker in ("no audio source found", "no video source found")
+    ):
+        return "stream_unavailable"
     return "unknown"
 
 
@@ -187,4 +192,9 @@ def friendly_youtube_error(error: object) -> str:
         return "لا يمكن استخراج البث المباشر حالياً؛ قد يكون غير مباشر الآن أو انتهى."
     if category == "unavailable":
         return "فيديو YouTube غير متاح في الوقت الحالي أو في موقع الخادم."
+    if category == "stream_unavailable":
+        return (
+            "تعذر فتح رابط الوسائط المستخرج من YouTube. "
+            "تمت تجربة مسارات تشغيل بديلة ولم ينجح أي منها."
+        )
     return "تعذر استخراج فيديو YouTube بعد محاولات PO Token وCookies وAnonymous."

@@ -131,6 +131,13 @@ class YouTubeHelpersTest(unittest.TestCase):
                 )
                 self.assertEqual(attempts[-1].strategy.value, "anonymous")
 
+    def test_stream_unavailable_has_safe_user_message(self):
+        message = helpers.friendly_youtube_error(
+            "No audio source found on a resolved YouTube URL"
+        )
+        self.assertIn("تعذر فتح رابط الوسائط", message)
+        self.assertNotIn("No audio source found", message)
+
     def test_duration_conversion(self):
         self.assertEqual(helpers.duration_to_seconds("01:02:03"), 3723)
         self.assertEqual(helpers.duration_to_seconds("45:10"), 2710)
@@ -144,6 +151,8 @@ class YouTubeHelpersTest(unittest.TestCase):
             "Sign in to confirm you're not a bot": "cookies_rejected",
             "No video formats found": "live_unavailable",
             "Video unavailable": "unavailable",
+            "No audio source found on direct URL": "stream_unavailable",
+            "No video source found on direct URL": "stream_unavailable",
         }
         for message, expected in cases.items():
             with self.subTest(message=message):

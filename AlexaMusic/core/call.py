@@ -18,7 +18,7 @@ from pyrogram import Client
 from pyrogram.errors import ChatAdminRequired, FloodWait
 from pytgcalls import PyTgCalls
 from pytgcalls import filters as fl
-from pytgcalls.exceptions import NoActiveGroupCall, YtDlpError
+from pytgcalls.exceptions import (\n    NoActiveGroupCall,\n    NoAudioSourceFound,\n    NoVideoSourceFound,\n    YtDlpError,\n)
 from pytgcalls.types import (
     AudioQuality,
     ChatUpdate,
@@ -87,19 +87,27 @@ def _media_stream(
     video_quality=None,
     video=False,
     image=None,
+    strict=False,
 ):
     kwargs = {
         "audio_parameters": audio_quality,
     }
     if video:
         kwargs["video_parameters"] = video_quality
+        if strict:
+            kwargs["audio_flags"] = MediaStream.Flags.REQUIRED
+            kwargs["video_flags"] = MediaStream.Flags.REQUIRED
         if audio_link:
             kwargs["audio_path"] = audio_link
         return MediaStream(link, **kwargs)
     if image and config.PRIVATE_BOT_MODE == str(True):
         kwargs["video_parameters"] = video_quality
         kwargs["audio_path"] = link
+        if strict:
+            kwargs["audio_flags"] = MediaStream.Flags.REQUIRED
         return MediaStream(image, **kwargs)
+    if strict:
+        kwargs["audio_flags"] = MediaStream.Flags.REQUIRED
     kwargs["video_flags"] = MediaStream.Flags.IGNORE
     return MediaStream(link, **kwargs)
 
@@ -160,6 +168,7 @@ async def _play_media_with_fallback(
             video_quality=video_quality,
             video=video,
             image=image,
+            strict=youtube,
         )
         try:
             kwargs = {"config": group_config} if group_config is not None else {}
@@ -172,7 +181,7 @@ async def _play_media_with_fallback(
                     "video" if video else "audio",
                 )
             return
-        except YtDlpError as error:
+        except (YtDlpError, NoAudioSourceFound, NoVideoSourceFound) as error:
             if attempt is None:
                 raise
             errors.append(error)
