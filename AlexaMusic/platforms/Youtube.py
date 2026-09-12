@@ -105,6 +105,19 @@ class YouTubeAPI:
     async def details(self, link: str, videoid: Union[bool, str] = None):
         if videoid:
             link = self.base + link
+
+        # A direct YouTube URL must never be passed to VideosSearch as a text
+        # query. With tracking parameters (e.g. youtu.be/<id>?si=...) the
+        # search API can return a completely different video.
+        if await self.exists(link):
+            info = await _yt_dlp_info(link)
+            title = info.get("title") or "Unknown title"
+            duration_sec = int(info.get("duration") or 0)
+            duration_min = seconds_to_min(duration_sec) if duration_sec else None
+            thumbnail = info.get("thumbnail") or config.YOUTUBE_IMG_URL
+            vidid = info["id"]
+            return title, duration_min, duration_sec, thumbnail, vidid
+
         if "&" in link:
             link = link.split("&")[0]
         try:
@@ -206,21 +219,11 @@ class YouTubeAPI:
     async def track(self, link: str, videoid: Union[bool, str] = None):
         if videoid:
             link = self.base + link
-        if "&" in link:
-            link = link.split("&")[0]
 
-        try:
-            results = VideosSearch(link, limit=1)
-            items = (await results.next()).get("result") or []
-            if not items:
-                raise RuntimeError("youtube-search-python returned no results")
-            result = items[0]
-            title = result["title"]
-            duration_min = result["duration"]
-            vidid = result["id"]
-            yturl = result["link"]
-            thumbnail = result["thumbnails"][0]["url"].split("?")[0]
-        except Exception:
+        # Resolve direct URLs by their actual video id instead of treating the
+        # URL as search text. This is especially important for youtu.be links
+        # containing ?si= tracking parameters.
+        if await self.exists(link):
             info = await _yt_dlp_info(link)
             title = info.get("title") or "Unknown title"
             duration = int(info.get("duration") or 0)
@@ -228,6 +231,28 @@ class YouTubeAPI:
             vidid = info["id"]
             yturl = info.get("webpage_url") or f"{self.base}{vidid}"
             thumbnail = info.get("thumbnail") or config.YOUTUBE_IMG_URL
+        else:
+            if "&" in link:
+                link = link.split("&")[0]
+            try:
+                results = VideosSearch(link, limit=1)
+                items = (await results.next()).get("result") or []
+                if not items:
+                    raise RuntimeError("youtube-search-python returned no results")
+                result = items[0]
+                title = result["title"]
+                duration_min = result["duration"]
+                vidid = result["id"]
+                yturl = result["link"]
+                thumbnail = result["thumbnails"][0]["url"].split("?")[0]
+            except Exception:
+                info = await _yt_dlp_info(link)
+                title = info.get("title") or "Unknown title"
+                duration = int(info.get("duration") or 0)
+                duration_min = seconds_to_min(duration) if duration else None
+                vidid = info["id"]
+                yturl = info.get("webpage_url") or f"{self.base}{vidid}"
+                thumbnail = info.get("thumbnail") or config.YOUTUBE_IMG_URL
 
         track_details = {
             "title": title,
