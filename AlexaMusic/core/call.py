@@ -16,8 +16,6 @@ from typing import Union
 
 from pyrogram import Client
 from pyrogram.errors import FloodWait, ChatAdminRequired
-from pyrogram.types import InlineKeyboardMarkup
-
 from pytgcalls import PyTgCalls
 from pytgcalls import filters as fl
 from ntgcalls import TelegramServerError
@@ -52,7 +50,6 @@ from AlexaMusic.utils.database import (
     set_loop,
 )
 from AlexaMusic.utils.exceptions import AssistantErr
-from AlexaMusic.utils.inline.play import stream_markup, telegram_markup
 from AlexaMusic.utils.rich_stream import send_stream_rich_message
 from AlexaMusic.utils.stream.autoclear import auto_clean
 from AlexaMusic.utils.thumbnails import gen_thumb
