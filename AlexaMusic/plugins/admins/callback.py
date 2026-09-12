@@ -368,6 +368,12 @@ async def del_back_playlist(client, CallbackQuery, _):
                 "غير مسموح لك بالتحكم بهذا التشغيل.",
                 show_alert=True,
             )
+        return await _handle_rich_control_action(
+            CallbackQuery,
+            _,
+            command,
+            chat_id,
+        )
     else:
         is_non_admin = await is_nonadmin_chat(CallbackQuery.message.chat.id)
         if not is_non_admin and CallbackQuery.from_user.id not in SUDOERS:
