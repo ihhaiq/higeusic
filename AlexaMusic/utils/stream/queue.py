@@ -26,6 +26,7 @@ async def put_queue(
     vidid,
     user_id,
     stream,
+    user_id=None,
     forceplay: Union[bool, str] = None,
 ):
     title = title.title()
@@ -41,6 +42,7 @@ async def put_queue(
         "chat_id": original_chat_id,
         "file": file,
         "vidid": vidid,
+        "user_id": user_id,
         "seconds": duration_in_seconds,
         "played": 0,
     }
@@ -83,6 +85,7 @@ async def put_queue_index(
         "chat_id": original_chat_id,
         "file": file,
         "vidid": vidid,
+        "user_id": user_id,
         "seconds": 0,
         "played": 0,
     }
