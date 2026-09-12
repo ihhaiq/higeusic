@@ -534,23 +534,21 @@ class Call(PyTgCalls):
                 else:
                     # theme = await check_theme(chat_id)
                     img = await gen_thumb(videoid)
-                    button = stream_markup(_, videoid, chat_id)
+                    requester_id = check[0].get("user_id") or config.OWNER_ID
                     try:
-                        run = await app.send_photo(
+                        run = await send_stream_rich_message(
                             original_chat_id,
-                            photo=img,
-                            caption=_["stream_1"].format(
-                                title[:27],
-                                f"https://t.me/{app.username}?start=info_{videoid}",
-                                check[0]["dur"],
-                                user,
-                            ),
-                            reply_markup=InlineKeyboardMarkup(button),
+                            image=img,
+                            title=title,
+                            is_video=str(streamtype) == "video",
+                            requester_id=requester_id,
+                            info_url=f"https://t.me/{app.username}?start=info_{videoid}",
+                            duration=check[0]["dur"],
                         )
                     except FloodWait as e:
                         await asyncio.sleep(e.value)
                     db[chat_id][0]["mystic"] = run
-                    db[chat_id][0]["markup"] = "stream"
+                    db[chat_id][0]["markup"] = "rich"
 
     async def ping(self):
         pings = []
