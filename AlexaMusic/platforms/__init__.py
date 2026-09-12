@@ -10,6 +10,7 @@ as you want or you can collabe if you have new ideas.
 """
 
 from .Apple import AppleAPI
+from .Carbon import CarbonAPI
 from .Resso import RessoAPI
 from .Soundcloud import SoundAPI
 from .Spotify import SpotifyAPI
