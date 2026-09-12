@@ -98,7 +98,7 @@ async def stream(
                     file_path, direct = await YouTube.download(
                         vidid, mystic, video=status, videoid=True
                     )
-                except:
+                except Exception:
                     raise AssistantErr(_["play_16"])
                 await Alexa.join_call(
                     chat_id, original_chat_id, file_path, video=status, image=thumbnail
@@ -152,7 +152,7 @@ async def stream(
             file_path, direct = await YouTube.download(
                 vidid, mystic, videoid=True, video=status
             )
-        except:
+        except Exception:
             raise AssistantErr(_["play_16"])
         if await is_active_chat(chat_id):
             await put_queue(

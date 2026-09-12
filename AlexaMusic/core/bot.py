@@ -10,13 +10,13 @@ as you want or you can collabe if you have new ideas.
 """
 
 import asyncio
-import sys
 
 from pyrogram import Client
+from pyrogram.enums import ChatMemberStatus
 from pyrogram.errors import FloodWait
+
 import config
 from ..logging import LOGGER
-from pyrogram.enums import ChatMemberStatus
 
 
 class AlexaBot(Client):
@@ -28,7 +28,7 @@ class AlexaBot(Client):
             bot_token=config.BOT_TOKEN,
             max_concurrent_transmissions=5,
         )
-        LOGGER(__name__).info("Starting Bot...")
+        LOGGER(__name__).info("جاري تشغيل البوت...")
 
     async def start(self):
         while True:
@@ -38,8 +38,9 @@ class AlexaBot(Client):
             except FloodWait as error:
                 wait_seconds = int(getattr(error, "value", 30))
                 LOGGER(__name__).warning(
-                    f"Telegram فرض انتظاراً لمدة {wait_seconds} ثانية قبل إعادة تسجيل دخول البوت. "
-                    "سيبقى السيرفر يعمل وينتظر تلقائياً بدون إعادة تشغيل متكررة."
+                    "Telegram فرض انتظاراً لمدة %s ثانية قبل إعادة تسجيل دخول البوت. "
+                    "سيبقى السيرفر يعمل وينتظر تلقائياً بدون إعادة تشغيل متكررة.",
+                    wait_seconds,
                 )
                 try:
                     await self.disconnect()
@@ -51,19 +52,22 @@ class AlexaBot(Client):
         self.username = get_me.username
         self.id = get_me.id
         self.mention = get_me.mention
+        self.name = (
+            f"{get_me.first_name} {get_me.last_name}"
+            if get_me.last_name
+            else get_me.first_name
+        )
+
         try:
-            await self.get_chat(config.LOG_GROUP_ID)
-        except Exception:
-            LOGGER(__name__).error(
-                "فشل البوت في الوصول إلى مجموعة السجل. أضف البوت إليها وارفعه مشرفاً."
+            member = await self.get_chat_member(config.LOG_GROUP_ID, self.id)
+            if member.status != ChatMemberStatus.ADMINISTRATOR:
+                LOGGER(__name__).warning(
+                    "البوت ليس مشرفاً في مجموعة السجل. سيستمر التشغيل بدون إيقاف الخدمة."
+                )
+        except Exception as error:
+            LOGGER(__name__).warning(
+                "تعذر التحقق من مجموعة السجل (%s). سيستمر تشغيل البوت.",
+                type(error).__name__,
             )
-            sys.exit()
-        a = await self.get_chat_member(config.LOG_GROUP_ID, self.id)
-        if a.status != ChatMemberStatus.ADMINISTRATOR:
-            LOGGER(__name__).error("يرجى رفع البوت مشرفاً في مجموعة السجل.")
-            sys.exit()
-        if get_me.last_name:
-            self.name = f"{get_me.first_name} {get_me.last_name}"
-        else:
-            self.name = get_me.first_name
-        LOGGER(__name__).info(f"بدأ بوت الموسيقى باسم {self.name}")
+
+        LOGGER(__name__).info("بدأ بوت الموسيقى باسم %s", self.name)

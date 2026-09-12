@@ -17,11 +17,12 @@ from pyrogram.types import InlineKeyboardMarkup, InputMediaPhoto, Message
 from pytgcalls.exceptions import NoActiveGroupCall
 
 import config
+from config import BANNED_USERS, lyrical
 from AlexaMusic import Apple, Resso, SoundCloud, Spotify, Telegram, YouTube, app
 from AlexaMusic.core.call import Alexa
 from AlexaMusic.utils import seconds_to_min, time_to_seconds
 from AlexaMusic.utils.channelplay import get_channeplayCB
-from AlexaMusic.utils.database import is_video_allowed
+from AlexaMusic.utils.database import is_served_user, is_video_allowed
 from AlexaMusic.utils.decorators.language import languageCB
 from AlexaMusic.utils.decorators.play import PlayWrapper
 from AlexaMusic.utils.formatters import formats
@@ -34,9 +35,7 @@ from AlexaMusic.utils.inline.play import (
 from AlexaMusic.utils.inline.playlist import botplaylist_markup
 from AlexaMusic.utils.logger import play_logs
 from AlexaMusic.utils.stream.stream import stream
-from config import BANNED_USERS, lyrical
 from strings import get_command
-from AlexaMusic.utils.database import is_served_user
 
 # Command
 PLAY_COMMAND = get_command("PLAY_COMMAND")
@@ -198,9 +197,9 @@ async def play_commnd(
                 )
         elif await Spotify.valid(url):
             spotify = True
-            if not config.SPOTIFY_CLIENT_ID and not config.SPOTIFY_CLIENT_SECRET:
+            if not config.SPOTIFY_CLIENT_ID or not config.SPOTIFY_CLIENT_SECRET:
                 return await mystic.edit_text(
-                    "ᴛʜɪs ʙᴏᴛ ᴄᴀɴ'ᴛ ᴩʟᴀʏ sᴩᴏᴛɪғʏ ᴛʀᴀᴄᴋs ᴀɴᴅ ᴩʟᴀʏʟɪsᴛs, ᴩʟᴇᴀsᴇ ᴄᴏɴᴛᴀᴄᴛ ᴍʏ ᴏᴡɴᴇʀ ᴀɴᴅ ᴀsᴋ ʜɪᴍ ᴛᴏ ᴀᴅᴅ sᴩᴏᴛɪғʏ ᴩʟᴀʏᴇʀ."
+                    "تشغيل Spotify غير متاح حالياً لأن بيانات Spotify غير مكتملة في إعدادات البوت."
                 )
             if "track" in url:
                 try:
@@ -658,7 +657,7 @@ async def slider_queries(client, CallbackQuery, _):
         query_type = 9 if rtype == 0 else int(rtype - 1)
         try:
             await CallbackQuery.answer(_["playcb_2"])
-        except:
+        except Exception:
             pass
         title, duration_min, thumbnail, vidid = await YouTube.slider(query, query_type)
         buttons = slider_markup(_, vidid, user_id, query, query_type, cplay, fplay)

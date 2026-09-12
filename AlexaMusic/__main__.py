@@ -11,78 +11,71 @@ as you want or you can collabe if you have new ideas.
 
 import asyncio
 import importlib
-from typing import Any
 
 from pyrogram import idle
-from pytgcalls.exceptions import NoActiveGroupCall
 
-import config
 from config import BANNED_USERS
 from AlexaMusic import LOGGER, app, userbot
 from AlexaMusic.core.call import Alexa
+from AlexaMusic.core.cookies import save_cookies
 from AlexaMusic.misc import sudo
 from AlexaMusic.plugins import ALL_MODULES
 from AlexaMusic.utils.database import get_banned_users, get_gbanned
-from AlexaMusic.core.cookies import save_cookies
 
 
 async def init() -> None:
-    # Check for at least one valid Pyrogram string session
-    if all(not getattr(config, f"STRING{i}") for i in range(1, 6)):
-        LOGGER("AlexaMusic").error("أضف جلسة Pyrogram للحساب المساعد ثم حاول مرة أخرى.")
-        exit()
     await sudo()
     try:
         for user_id in await get_gbanned():
             BANNED_USERS.add(user_id)
         for user_id in await get_banned_users():
             BANNED_USERS.add(user_id)
-    except Exception:
-        pass
+    except Exception as error:
+        LOGGER("AlexaMusic").warning(
+            "تعذر تحميل قوائم الحظر عند بدء التشغيل: %s",
+            type(error).__name__,
+        )
+
     await app.start()
     await save_cookies()
+
     for module in ALL_MODULES:
         importlib.import_module(f"AlexaMusic.plugins{module}")
-    LOGGER("AlexaMusic.plugins").info("Necessary Modules Imported Successfully.")
-    assistant_started = False
+    LOGGER("AlexaMusic.plugins").info("تم تحميل وحدات البوت بنجاح.")
+
+    userbot_started = False
+    playback_started = False
     try:
-        await userbot.start()
-        assistant_started = True
+        assistant_count = await userbot.start()
+        userbot_started = True
+        await Alexa.start()
+        await Alexa.decorators()
+        playback_started = True
+        LOGGER("AlexaMusic").info(
+            "تم تشغيل نظام الموسيقى بنجاح باستخدام %s حساب مساعد.",
+            assistant_count,
+        )
     except Exception as error:
         LOGGER("AlexaMusic").error(
-            "فشل تشغيل الحساب المساعد: %s. "
+            "تعذر تشغيل نظام المساعد: %s. "
             "سيبقى البوت متصلاً في الوضع المحدود، لكن تشغيل الموسيقى غير متاح. "
-            "أعد إنشاء STRING_SESSION باستخدام genstring.py الموجود في المشروع.",
+            "تحقق من STRING_SESSION وأنشئها باستخدام genstring.py إذا لزم الأمر.",
             error,
         )
 
-    if assistant_started:
-        await Alexa.start()
-        try:
-            await Alexa.stream_call("https://telegra.ph/file/b60b80ccb06f7a48f68b5.mp4")
-        except NoActiveGroupCall:
-            LOGGER("AlexaMusic").warning(
-                "لم يتم العثور على محادثة صوتية فعالة أثناء فحص بدء التشغيل. "
-                "سيبقى البوت متصلاً؛ افتح محادثة صوتية قبل التشغيل."
-            )
-        except Exception as error:
-            LOGGER("AlexaMusic").warning(
-                "فشل فحص المكالمة عند بدء التشغيل: %s. سيبقى البوت متصلاً.", error
-            )
-        await Alexa.decorators()
-        LOGGER("AlexaMusic").info("تم تشغيل بوت الموسيقى بنجاح")
-    else:
+    if not playback_started:
         LOGGER("AlexaMusic").warning(
-            "تم تشغيل بوت الموسيقى في الوضع المحدود بدون حساب مساعد."
+            "تم تشغيل البوت في الوضع المحدود بدون نظام تشغيل صوتي فعّال."
         )
 
-    await idle()
-    await app.stop()
-    if assistant_started:
-        await userbot.stop()
-    LOGGER("AlexaMusic").info("جاري إيقاف بوت الموسيقى...")
+    try:
+        await idle()
+    finally:
+        await app.stop()
+        if userbot_started:
+            await userbot.stop()
+        LOGGER("AlexaMusic").info("تم إيقاف بوت الموسيقى.")
 
 
 if __name__ == "__main__":
-    asyncio.get_event_loop().run_until_complete(init())
-    LOGGER("AlexaMusic").info("تم إيقاف بوت الموسيقى")
+    asyncio.run(init())

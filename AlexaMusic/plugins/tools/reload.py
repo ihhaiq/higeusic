@@ -12,7 +12,7 @@ as you want or you can collabe if you have new ideas.
 import asyncio
 
 from pyrogram import filters
-from pyrogram.enums import ChatMembersFilter, ChatMemberStatus
+from pyrogram.enums import ChatMembersFilter
 from pyrogram.types import CallbackQuery, Message
 
 from config import BANNED_USERS, MUSIC_BOT_NAME, adminlist, lyrical
@@ -46,7 +46,7 @@ async def reload_admin_cache(client, message: Message, _):
         await message.reply_text(_["admin_20"])
     except Exception:
         await message.reply_text(
-            "ғᴀɪʟᴇᴅ ᴛᴏ ʀᴇғʀᴇsʜ ᴀᴅᴍɪɴs ʟɪsᴛ, ᴍᴀᴋᴇ sᴜʀᴇ ʏᴏᴜ ᴩʀᴏᴍᴏᴛᴇᴅ ᴛʜᴇ ʙᴏᴛ."
+            "تعذر تحديث قائمة المشرفين. تأكد من أن البوت مشرف ولديه الصلاحيات المطلوبة."
         )
 
 
@@ -54,7 +54,7 @@ async def reload_admin_cache(client, message: Message, _):
 @AdminActual
 async def restartbot(client, message: Message, _):
     mystic = await message.reply_text(
-        f"ᴩʟᴇᴀsᴇ ᴡᴀɪᴛ ʀᴇʙᴏᴏᴛɪɴɢ {MUSIC_BOT_NAME} ғᴏʀ ʏᴏᴜʀ ᴄʜᴀᴛ."
+        f"يرجى الانتظار، جاري إعادة تهيئة {MUSIC_BOT_NAME} لهذه المحادثة..."
     )
     await asyncio.sleep(1)
     try:
@@ -74,7 +74,7 @@ async def restartbot(client, message: Message, _):
         except Exception:
             pass
     return await mystic.edit_text(
-        "sᴜᴄᴄᴇssғᴜʟʟʏ ʀᴇʙᴏᴏᴛᴇᴅ {MUSIC_BOT_NAME} ғᴏʀ ʏᴏᴜʀ ᴄʜᴀᴛ, ɴᴏᴡ ʏᴏᴜ ᴄᴀɴ sᴛᴀʀᴛ ᴩʟᴀʏɪɴɢ ᴀɢᴀɪɴ..."
+        f"تمت إعادة تهيئة {MUSIC_BOT_NAME} لهذه المحادثة، ويمكنك بدء التشغيل من جديد."
     )
 
 
@@ -94,11 +94,11 @@ async def stop_download(client, CallbackQuery: CallbackQuery, _):
     task = lyrical.get(message_id)
     if not task:
         return await CallbackQuery.answer(
-            "ᴅᴏᴡɴʟᴏᴀᴅ ᴀʟʀᴇᴀᴅʏ ᴄᴏᴍᴩʟᴇᴛᴇᴅ.", show_alert=True
+            "اكتمل التنزيل بالفعل.", show_alert=True
         )
     if task.done() or task.cancelled():
         return await CallbackQuery.answer(
-            "ᴅᴏᴡɴʟᴏᴀᴅɪɴɢ ᴀʟʀᴇᴀᴅʏ ᴄᴏᴍᴩʟᴇᴛᴇᴅ ᴏʀ ᴄᴀɴᴄᴇʟʟᴇᴅ.",
+            "اكتمل التنزيل أو تم إلغاؤه بالفعل.",
             show_alert=True,
         )
     if not task.done():
@@ -108,12 +108,12 @@ async def stop_download(client, CallbackQuery: CallbackQuery, _):
                 lyrical.pop(message_id)
             except Exception:
                 pass
-            await CallbackQuery.answer("ᴅᴏᴡɴʟᴏᴀᴅɪɢ ᴄᴀɴᴄᴇʟʟᴇᴅ.", show_alert=True)
+            await CallbackQuery.answer("تم إلغاء التنزيل.", show_alert=True)
             return await CallbackQuery.edit_message_text(
-                f"ᴅᴏᴡɴʟᴏᴀᴅɪɴɢ ᴩʀᴏᴄᴇss ᴄᴀɴᴄᴇʟʟᴇᴅ ʙʏ {CallbackQuery.from_user.mention}"
+                f"تم إلغاء التنزيل بواسطة {CallbackQuery.from_user.mention}"
             )
         except Exception:
             return await CallbackQuery.answer(
-                "ғᴀɪʟᴇᴅ ᴛᴏ ᴄᴀɴᴄᴇʟ ᴅᴏᴡɴʟᴏᴀᴅɪɴɢ...", show_alert=True
+                "تعذر إلغاء التنزيل.", show_alert=True
             )
-    await CallbackQuery.answer("ғᴀɪʟᴇᴅ ᴛᴏ ʀᴇᴄᴏɢɴɪᴢᴇ ᴛʜᴇ ᴏɴɢᴏɪɴɢ ᴛᴀsᴋ.", show_alert=True)
+    await CallbackQuery.answer("تعذر العثور على مهمة التنزيل الحالية.", show_alert=True)

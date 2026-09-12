@@ -11,7 +11,6 @@ as you want or you can collabe if you have new ideas.
 
 import asyncio
 
-from pyrogram import filters
 from pyrogram import enums, filters
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message
 from youtubesearchpython.__future__ import VideosSearch
@@ -271,7 +270,7 @@ async def welcome(client, message: Message):
                     _["start_5"].format(config.MUSIC_BOT_NAME, member.mention)
                 )
             return
-        except:
+        except Exception:
             return
 
 

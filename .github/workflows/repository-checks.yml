@@ -1,0 +1,41 @@
+name: Repository checks
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile Python sources
+        run: python -m compileall -q AlexaMusic config strings genstring.py
+      - name: Check internal imports and plugin allowlist
+        run: python scripts/check_internal_imports.py
+      - name: Validate localization YAML
+        run: |
+          python -m pip install --disable-pip-version-check "PyYAML~=6.0.3"
+          python - <<'PY'
+          from pathlib import Path
+          import yaml
+
+          lang_dir = Path("strings/langs")
+          loaded = {}
+          for path in lang_dir.glob("*.yml"):
+              with path.open("r", encoding="utf-8") as file:
+                  data = yaml.safe_load(file)
+              if not isinstance(data, dict):
+                  raise SystemExit(f"{path}: expected a YAML mapping")
+              loaded[path.stem] = data
+
+          missing = sorted(set(loaded["en"]) - set(loaded["ar"]))
+          if missing:
+              raise SystemExit(f"Arabic localization is missing keys: {missing}")
+          print("Localization YAML is valid and Arabic covers all English keys.")
+          PY

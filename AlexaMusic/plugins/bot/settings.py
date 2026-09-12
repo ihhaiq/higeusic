@@ -18,10 +18,9 @@ from pyrogram.types import (
     Message,
 )
 
-from config import BANNED_USERS, CLEANMODE_DELETE_MINS, MUSIC_BOT_NAME, OWNER_ID
+from config import BANNED_USERS, CLEANMODE_DELETE_MINS, MUSIC_BOT_NAME
 from strings import get_command
 from AlexaMusic import app
-from pyrogram.enums import ChatType
 from AlexaMusic.utils.database import (
     add_nonadmin_chat,
     cleanmode_off,
@@ -56,7 +55,6 @@ from AlexaMusic.utils.inline.settings import (
     setting_markup,
     video_quality_markup,
 )
-from AlexaMusic.utils.inline.start import private_panel
 
 ### Command
 SETTINGS_COMMAND = get_command("SETTINGS_COMMAND")
@@ -87,31 +85,6 @@ async def settings_cb(client, CallbackQuery, _):
         ),
         reply_markup=InlineKeyboardMarkup(buttons),
     )
-
-
-@app.on_callback_query(filters.regex("settingsback_helper") & ~BANNED_USERS)
-@languageCB
-async def settings_back_markup(client, CallbackQuery: CallbackQuery, _):
-    try:
-        await CallbackQuery.answer()
-    except Exception:
-        pass
-    if CallbackQuery.message.chat.type == ChatType.PRIVATE:
-        try:
-            await app.resolve_peer(OWNER_ID[0])
-            OWNER = OWNER_ID[0]
-        except Exception:
-            OWNER = None
-        buttons = private_panel(_, app.username, OWNER)
-        return await CallbackQuery.edit_message_text(
-            caption=_["start_2"].format(CallbackQuery.from_user.mention, app.mention),
-            reply_markup=InlineKeyboardMarkup(buttons),
-        )
-    else:
-        buttons = setting_markup(_)
-        return await CallbackQuery.edit_message_reply_markup(
-            reply_markup=InlineKeyboardMarkup(buttons)
-        )
 
 
 ## Audio and Video Quality
@@ -324,7 +297,7 @@ async def playmode_ans(client, CallbackQuery, _):
     if command == "PLAYTYPECHANGE":
         try:
             await CallbackQuery.answer(_["set_cb_6"], show_alert=True)
-        except:
+        except Exception:
             pass
         playty = await get_playtype(CallbackQuery.message.chat.id)
         if playty == "Everyone":

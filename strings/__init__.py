@@ -1,58 +1,46 @@
-#
-# Copyright (C) 2021-2022 by Alexa_Help@Github, < https://github.com/Jankarikiduniya >.
-# A Powerful Music Bot Property Of Rocks Indian Largest Chatting Group
+"""Load commands and localization files."""
 
-# Kanged By © @Dr_Asad_Ali
-# Rocks © @Shayri_Music_Lovers
-# Owner Asad Ali
-# Harshit Sharma
-# All rights reserved. © Alisha © Alexa © Yukki
-
-
-import os
-from typing import List
+from pathlib import Path
+from typing import Any
 
 import yaml
 
-languages = {}
-commands = {}
-languages_present = {}
+BASE_DIR = Path(__file__).resolve().parent
+LANG_DIR = BASE_DIR / "langs"
+
+languages: dict[str, dict[str, Any]] = {}
+commands: dict[str, dict[str, Any]] = {}
+languages_present: dict[str, str] = {}
 
 
-def get_command(value: str) -> List:
+def _load_yaml(path: Path) -> dict[str, Any]:
+    with path.open("r", encoding="utf-8") as file:
+        data = yaml.safe_load(file) or {}
+    if not isinstance(data, dict):
+        raise ValueError(f"Invalid YAML mapping in {path}")
+    return data
+
+
+commands["command"] = _load_yaml(BASE_DIR / "command.yml")
+
+english = _load_yaml(LANG_DIR / "en.yml")
+languages["en"] = english
+languages_present["en"] = str(english.get("name", "English"))
+
+for path in sorted(LANG_DIR.glob("*.yml")):
+    language_name = path.stem
+    if language_name == "en":
+        continue
+
+    localized = _load_yaml(path)
+    merged = {**english, **localized}
+    languages[language_name] = merged
+    languages_present[language_name] = str(merged.get("name", language_name))
+
+
+def get_command(value: str) -> list[str]:
     return commands["command"][value]
 
 
-def get_string(lang: str):
-    return languages[lang]
-
-
-for filename in os.listdir(r"./strings"):
-    if filename.endswith(".yml"):
-        language_name = filename[:-4]
-        commands[language_name] = yaml.safe_load(
-            open(f"./strings/{filename}", encoding="utf8")
-        )
-
-
-for filename in os.listdir(r"./strings/langs/"):
-    if "en" not in languages:
-        languages["en"] = yaml.safe_load(
-            open(r"./strings/langs/en.yml", encoding="utf8")
-        )
-        languages_present["en"] = languages["en"]["name"]
-    if filename.endswith(".yml"):
-        language_name = filename[:-4]
-        if language_name == "en":
-            continue
-        languages[language_name] = yaml.safe_load(
-            open(f"./strings/langs/{filename}", encoding="utf8")
-        )
-        for item in languages["en"]:
-            if item not in languages[language_name]:
-                languages[language_name][item] = languages["en"][item]
-    try:
-        languages_present[language_name] = languages[language_name]["name"]
-    except Exception:
-        print("There is some issue with the language files.")
-        exit()
+def get_string(lang: str) -> dict[str, Any]:
+    return languages.get(lang) or languages.get("ar") or languages["en"]
