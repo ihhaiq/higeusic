@@ -6,6 +6,7 @@ from types import SimpleNamespace as NS
 from unittest.mock import AsyncMock, patch
 
 from pyrogram import filters
+from pyrogram.enums import ChatType
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -24,6 +25,7 @@ class DeveloperPanelTests(unittest.IsolatedAsyncioTestCase):
         self.bot = NS(
             on_message=lambda *_args, **_kwargs: lambda function: function,
             on_callback_query=lambda *_args, **_kwargs: lambda function: function,
+            get_chat=AsyncMock(),
         )
         self.database = NS(
             add_private_chat=AsyncMock(),
@@ -31,7 +33,12 @@ class DeveloperPanelTests(unittest.IsolatedAsyncioTestCase):
             is_served_private_chat=AsyncMock(return_value=False),
             remove_private_chat=AsyncMock(),
         )
-        self.chat = NS(id=-1001234567890, title="Allowed channel")
+        self.chat = NS(
+            id=-1001234567890,
+            title="Allowed channel",
+            type=ChatType.SUPERGROUP,
+        )
+        self.bot.get_chat.return_value = self.chat
         self.resolve = AsyncMock(return_value=self.chat)
         dependencies = {
             "config": NS(OWNER_ID=42),
@@ -49,7 +56,8 @@ class DeveloperPanelTests(unittest.IsolatedAsyncioTestCase):
         message = NS(reply_text=AsyncMock())
         await self.dev._change_authorization(message, "add", "@allowed")
 
-        self.resolve.assert_awaited_once_with("@allowed")
+        self.bot.get_chat.assert_awaited_once_with("@allowed")
+        self.resolve.assert_not_awaited()
         self.database.add_private_chat.assert_awaited_once_with(self.chat.id)
         self.database.remove_private_chat.assert_not_awaited()
 
@@ -59,6 +67,20 @@ class DeveloperPanelTests(unittest.IsolatedAsyncioTestCase):
         await self.dev._change_authorization(message, "remove", str(self.chat.id))
 
         self.database.remove_private_chat.assert_awaited_once_with(self.chat.id)
+
+    async def test_numeric_chat_id_is_passed_as_an_integer(self):
+        message = NS(reply_text=AsyncMock())
+        await self.dev._change_authorization(message, "add", str(self.chat.id))
+
+        self.bot.get_chat.assert_awaited_once_with(self.chat.id)
+
+    async def test_assistant_resolution_is_only_a_fallback(self):
+        self.bot.get_chat.side_effect = RuntimeError("bot cannot resolve")
+        message = NS(reply_text=AsyncMock())
+        await self.dev._change_authorization(message, "add", "@allowed")
+
+        self.resolve.assert_awaited_once_with("@allowed")
+        self.database.add_private_chat.assert_awaited_once_with(self.chat.id)
 
     async def test_non_developer_cannot_open_panel(self):
         message = NS(
