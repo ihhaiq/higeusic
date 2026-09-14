@@ -544,6 +544,14 @@ class YouTubeAPI:
         Path("downloads").mkdir(parents=True, exist_ok=True)
         args = [
             "--no-playlist",
+            "--retries",
+            "3",
+            "--fragment-retries",
+            "5",
+            "--retry-sleep",
+            "2",
+            "--concurrent-fragments",
+            "1",
             "--format",
             format_selector,
             "--output",
