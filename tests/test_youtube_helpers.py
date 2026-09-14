@@ -68,6 +68,7 @@ class YouTubeHelpersTest(unittest.TestCase):
             [(attempt.strategy.value, attempt.player_client) for attempt in attempts],
             [
                 ("po_token", "mweb"),
+                ("anonymous", None),
                 ("anonymous", "web_safari"),
                 ("anonymous", "tv"),
                 ("anonymous", "web"),
@@ -101,6 +102,7 @@ class YouTubeHelpersTest(unittest.TestCase):
         self.assertEqual(
             [(attempt.strategy.value, attempt.player_client) for attempt in attempts],
             [
+                ("anonymous", None),
                 ("anonymous", "mweb"),
                 ("anonymous", "web_safari"),
                 ("anonymous", "tv"),
@@ -118,7 +120,7 @@ class YouTubeHelpersTest(unittest.TestCase):
             )
             self.assertEqual(
                 [attempt.strategy.value for attempt in attempts],
-                ["anonymous"],
+                ["anonymous", "anonymous"],
             )
 
             path.write_text(
@@ -132,7 +134,7 @@ class YouTubeHelpersTest(unittest.TestCase):
             )
             self.assertEqual(
                 [attempt.strategy.value for attempt in attempts],
-                ["anonymous", "cookies"],
+                ["anonymous", "anonymous", "cookies"],
             )
 
     def test_cookies_are_always_last_when_available(self):
