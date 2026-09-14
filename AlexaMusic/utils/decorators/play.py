@@ -37,7 +37,7 @@ from AlexaMusic.utils.database.memorydatabase import is_maintenance
 from AlexaMusic.utils.exceptions import AssistantErr
 from AlexaMusic.utils.inline.playlist import botplaylist_markup
 from AlexaMusic.utils.play_request import is_video_request, play_command_name
-from config import OWNER_ID, PLAYLIST_IMG_URL, PRIVATE_BOT_MODE, adminlist
+from config import OWNER_ID, PLAYLIST_IMG_URL, adminlist
 from strings import get_string
 
 links = {}
@@ -52,13 +52,12 @@ def PlayWrapper(command):
             return await message.reply_text(
                 "البوت في وضع الصيانة حالياً. يرجى المحاولة لاحقاً."
             )
-        if PRIVATE_BOT_MODE == str(True) and not await is_served_private_chat(
-            message.chat.id
-        ):
+        if not await is_served_private_chat(message.chat.id):
             await message.reply_text(
-                "**بوت موسيقى خاص**\n\nهذه المحادثة غير مخولة لاستخدام البوت. اطلب من المالك تخويلها أولاً."
+                "هذه المجموعة/القناة غير مصرحة لاستخدام التشغيل. "
+                "أضفها من /dev ← إضافة قناة."
             )
-            return await app.leave_chat(message.chat.id)
+            return
         if not is_channel_post and await is_commanddelete_on(message.chat.id):
             try:
                 await message.delete()
@@ -119,6 +118,10 @@ def PlayWrapper(command):
         else:
             chat_id = message.chat.id
             channel = None
+        if chat_id != message.chat.id and not await is_served_private_chat(chat_id):
+            return await message.reply_text(
+                "القناة المستهدفة غير مصرحة. أضفها من /dev ← إضافة قناة."
+            )
         playmode = await get_playmode(message.chat.id)
         playty = await get_playtype(message.chat.id)
         # Only channel admins can publish channel posts, and Telegram doesn't
