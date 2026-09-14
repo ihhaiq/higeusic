@@ -82,17 +82,38 @@ def build_attempts(
     has_cookies: bool,
     player_clients: object = None,
 ) -> tuple[YouTubeAttempt, ...]:
+    """Build public-video fallbacks first and keep account cookies last."""
+    clients = parse_player_clients(player_clients)
     attempts: list[YouTubeAttempt] = []
-    if pot_enabled:
-        for client in parse_player_clients(player_clients):
-            attempts.append(
-                YouTubeAttempt(
-                    YouTubeAuthStrategy.PO_TOKEN,
-                    use_plugins=True,
-                    use_cookies=False,
-                    player_client=client,
-                )
+
+    # bgutil's recommended path is mweb with an automatically bound PO Token.
+    if pot_enabled and "mweb" in clients:
+        attempts.append(
+            YouTubeAttempt(
+                YouTubeAuthStrategy.PO_TOKEN,
+                use_plugins=True,
+                use_cookies=False,
+                player_client="mweb",
             )
+        )
+
+    # web_safari can expose HLS without a GVS PO Token.  Keep the other
+    # configured clients as isolated anonymous fallbacks for public videos.
+    anonymous_clients = tuple(client for client in clients if client != "mweb")
+    if not anonymous_clients and not pot_enabled:
+        anonymous_clients = clients
+    for client in anonymous_clients:
+        attempts.append(
+            YouTubeAttempt(
+                YouTubeAuthStrategy.ANONYMOUS,
+                use_plugins=False,
+                use_cookies=False,
+                player_client=client,
+            )
+        )
+
+    # Cookies are intentionally last: public playback must not depend on a
+    # frequently expiring account session.
     if has_cookies:
         attempts.append(
             YouTubeAttempt(
@@ -101,15 +122,7 @@ def build_attempts(
                 use_cookies=True,
             )
         )
-    attempts.append(
-        YouTubeAttempt(
-            YouTubeAuthStrategy.ANONYMOUS,
-            use_plugins=False,
-            use_cookies=False,
-        )
-    )
     return tuple(attempts)
-
 
 def duration_to_seconds(duration) -> int:
     if duration in (None, "", False):
@@ -156,6 +169,33 @@ def classify_youtube_error(error: object) -> str:
     if any(
         marker in text
         for marker in (
+            "http error 403",
+            "403 forbidden",
+            "requested format is not available",
+        )
+    ):
+        return "http_403"
+    if any(
+        marker in text
+        for marker in (
+            "too many requests",
+            "http error 429",
+            "rate limit",
+        )
+    ):
+        return "rate_limited"
+    if any(
+        marker in text
+        for marker in (
+            "po token",
+            "pot provider",
+            "youtubepot",
+        )
+    ):
+        return "po_token_failed"
+    if any(
+        marker in text
+        for marker in (
             "live stream offline",
             "premieres in",
             "not currently live",
@@ -185,8 +225,16 @@ def friendly_youtube_error(error: object) -> str:
         return "هذا الفيديو مقيّد بالعمر، ولم تنجح محاولة Cookies المصرح بها."
     if category == "cookies_rejected":
         return (
-            "تعذر استخراج الفيديو من YouTube. يبدو أن YouTube طلب تسجيل الدخول "
-            "أو رفض طلب الخادم. جرّب لاحقاً أو أضف Cookies صالحة من إعدادات السيرفر."
+            "رفض YouTube طلب الخادم حتى بعد تجربة مسارات التشغيل العامة. "
+            "الفيديوهات الخاصة أو المقيّدة فقط قد تحتاج Cookies صالحة."
+        )
+    if category == "http_403":
+        return "رفض YouTube رابط الوسائط (403) بعد تجربة مسارات تشغيل بديلة."
+    if category == "rate_limited":
+        return "قيّد YouTube طلبات عنوان الخادم مؤقتاً. جرّب بعد قليل."
+    if category == "po_token_failed":
+        return (
+            "فشل مزوّد PO Token، وتمت تجربة المسارات العامة البديلة دون نجاح."
         )
     if category == "live_unavailable":
         return "لا يمكن استخراج البث المباشر حالياً؛ قد يكون غير مباشر الآن أو انتهى."
@@ -197,4 +245,4 @@ def friendly_youtube_error(error: object) -> str:
             "تعذر فتح رابط الوسائط المستخرج من YouTube. "
             "تمت تجربة مسارات تشغيل بديلة ولم ينجح أي منها."
         )
-    return "تعذر استخراج فيديو YouTube بعد محاولات PO Token وCookies وAnonymous."
+    return "تعذر استخراج فيديو YouTube بعد تجربة PO Token والمسارات العامة وCookies الاختيارية."
