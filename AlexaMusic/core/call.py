@@ -73,6 +73,194 @@ async def telegram_media_fallback_reply_handler(_, message):
     route_telegram_media_fallback_reply(message)
 
 
+_long_video_download_slots = asyncio.Semaphore(
+    max(1, int(getattr(config, "LONG_VIDEO_DOWNLOAD_CONCURRENCY", 1)))
+)
+_long_video_sessions: dict[int, dict] = {}
+
+
+async def _download_long_video_segment(
+    link: str,
+    *,
+    chat_id: int,
+    segment_index: int,
+    start_seconds: int,
+    end_seconds: int,
+) -> str:
+    """Serialize CPU/network-heavy long-video downloads per Railway instance."""
+    LOGGER(__name__).info(
+        "Long-video segment queued chat_id=%s segment=%s range=%s-%s",
+        chat_id,
+        segment_index + 1,
+        start_seconds,
+        end_seconds,
+    )
+    async with _long_video_download_slots:
+        LOGGER(__name__).info(
+            "Long-video segment download started chat_id=%s segment=%s",
+            chat_id,
+            segment_index + 1,
+        )
+        path = await YouTube.download_stream_video_segment(
+            link,
+            chat_id=chat_id,
+            start_seconds=start_seconds,
+            end_seconds=end_seconds,
+            segment_index=segment_index,
+            max_height=int(getattr(config, "LONG_VIDEO_MAX_QUALITY", 360)),
+        )
+        LOGGER(__name__).info(
+            "Long-video segment ready chat_id=%s segment=%s path=%s",
+            chat_id,
+            segment_index + 1,
+            path,
+        )
+        return path
+
+
+def _schedule_next_long_video_segment(chat_id: int) -> None:
+    session = _long_video_sessions.get(chat_id)
+    if not session or session.get("next_task") is not None:
+        return
+    segment_index = int(session["next_index"])
+    start_seconds = segment_index * int(session["segment_seconds"])
+    if start_seconds >= int(session["total_seconds"]):
+        return
+    end_seconds = min(
+        int(session["total_seconds"]),
+        start_seconds + int(session["segment_seconds"]),
+    )
+    session["next_task"] = asyncio.create_task(
+        _download_long_video_segment(
+            session["link"],
+            chat_id=chat_id,
+            segment_index=segment_index,
+            start_seconds=start_seconds,
+            end_seconds=end_seconds,
+        )
+    )
+
+
+async def _cancel_long_video_session(chat_id: int, *, remove_current: bool = True) -> None:
+    session = _long_video_sessions.pop(chat_id, None)
+    if not session:
+        return
+    task = session.get("next_task")
+    if task and not task.done():
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError, Exception):
+            await task
+    if remove_current:
+        current = session.get("current_path")
+        if current:
+            with contextlib.suppress(Exception):
+                os.remove(current)
+
+
+async def _start_segmented_long_video(
+    player,
+    chat_id: int,
+    link: str,
+    *,
+    audio_quality,
+    video_quality,
+    duration_seconds: int,
+    group_config=None,
+) -> str:
+    await _cancel_long_video_session(chat_id)
+    segment_seconds = max(
+        120,
+        int(getattr(config, "LONG_VIDEO_SEGMENT_MIN", 8)) * 60,
+    )
+    first_end = min(duration_seconds, segment_seconds)
+    first_path = await _download_long_video_segment(
+        link,
+        chat_id=chat_id,
+        segment_index=0,
+        start_seconds=0,
+        end_seconds=first_end,
+    )
+    stream = _media_stream(
+        first_path,
+        audio_quality=audio_quality,
+        video_quality=video_quality,
+        video=True,
+        strict=True,
+    )
+    kwargs = {"config": group_config} if group_config is not None else {}
+    await player.play(chat_id, stream, **kwargs)
+    _long_video_sessions[chat_id] = {
+        "link": link,
+        "total_seconds": int(duration_seconds),
+        "segment_seconds": segment_seconds,
+        "next_index": 1,
+        "next_task": None,
+        "current_path": first_path,
+        "audio_quality": audio_quality,
+        "video_quality": video_quality,
+    }
+    _schedule_next_long_video_segment(chat_id)
+    LOGGER(__name__).info(
+        "Segmented long-video playback started chat_id=%s duration=%s segment_seconds=%s",
+        chat_id,
+        duration_seconds,
+        segment_seconds,
+    )
+    return first_path
+
+
+async def _continue_segmented_long_video(player, chat_id: int) -> bool:
+    """Play the prepared next segment. Return True when stream-end is consumed."""
+    session = _long_video_sessions.get(chat_id)
+    if not session:
+        return False
+    task = session.get("next_task")
+    if task is None:
+        await _cancel_long_video_session(chat_id)
+        return False
+    try:
+        next_path = await task
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        LOGGER(__name__).exception(
+            "Failed to prepare next long-video segment chat_id=%s",
+            chat_id,
+        )
+        await _cancel_long_video_session(chat_id)
+        return False
+
+    previous = session.get("current_path")
+    stream = _media_stream(
+        next_path,
+        audio_quality=session["audio_quality"],
+        video_quality=session["video_quality"],
+        video=True,
+        strict=True,
+    )
+    try:
+        await player.play(chat_id, stream)
+    except Exception:
+        with contextlib.suppress(Exception):
+            os.remove(next_path)
+        await _cancel_long_video_session(chat_id)
+        raise
+
+    if previous:
+        with contextlib.suppress(Exception):
+            os.remove(previous)
+    session["current_path"] = next_path
+    session["next_index"] = int(session["next_index"]) + 1
+    session["next_task"] = None
+    _schedule_next_long_video_segment(chat_id)
+    LOGGER(__name__).info(
+        "Advanced segmented long-video playback chat_id=%s segment=%s",
+        chat_id,
+        session["next_index"],
+    )
+    return True
+
+
 async def _video_quality_for_duration(chat_id: int, duration=None):
     quality = await get_video_bitrate(chat_id)
     threshold = max(0, int(getattr(config, "LONG_VIDEO_THRESHOLD_MIN", 30))) * 60
@@ -151,6 +339,7 @@ async def _play_media_with_fallback(
     group_config=None,
     allow_local_fallback=False,
     fallback_client=None,
+    duration=None,
 ):
     youtube = isinstance(link, str) and YouTube.is_youtube_url(link)
     LOGGER(__name__).info(
@@ -231,6 +420,34 @@ async def _play_media_with_fallback(
     if youtube and allow_local_fallback:
         media_kind = "video" if video else "audio"
         media_label = "الفيديو" if video else "الصوت"
+
+        duration_seconds = duration_to_seconds(duration)
+        long_video_threshold = (
+            max(0, int(getattr(config, "LONG_VIDEO_THRESHOLD_MIN", 30))) * 60
+        )
+        if (
+            video
+            and long_video_threshold
+            and duration_seconds >= long_video_threshold
+        ):
+            try:
+                return await _start_segmented_long_video(
+                    player,
+                    chat_id,
+                    link,
+                    audio_quality=audio_quality,
+                    video_quality=video_quality,
+                    duration_seconds=duration_seconds,
+                    group_config=group_config,
+                )
+            except Exception as error:
+                errors.append(error)
+                LOGGER(__name__).warning(
+                    "Segmented long-video fallback failed chat_id=%s: %s",
+                    chat_id,
+                    str(error).replace("\n", " ")[-500:],
+                )
+                await _cancel_long_video_session(chat_id)
 
         async def play_downloaded_file(path):
             stream = _media_stream(
@@ -320,50 +537,80 @@ async def _play_media_with_fallback(
                 media_kind,
                 external_chat_id,
             )
-            external_path = None
-            try:
-                external_path = await fetch_media_from_telegram_bot(
-                    fallback_client,
-                    source_chat_id=external_chat_id,
-                    bot_username=external_bot,
-                    command=command,
-                    link=link,
-                    request_chat_id=chat_id,
-                    response_timeout=getattr(
-                        config,
-                        "TELEGRAM_MEDIA_FALLBACK_RESPONSE_TIMEOUT",
-                        180,
-                    ),
-                    download_timeout=getattr(
-                        config,
-                        "TELEGRAM_MEDIA_FALLBACK_DOWNLOAD_TIMEOUT",
-                        900,
-                    ),
-                    cleanup=getattr(
-                        config,
-                        "TELEGRAM_MEDIA_FALLBACK_CLEANUP",
-                        True,
-                    ),
-                )
-                await play_downloaded_file(external_path)
-                LOGGER(__name__).info(
-                    "Streaming YouTube %s from external Telegram fallback "
-                    "chat_id=%s path=%s",
-                    media_kind,
-                    chat_id,
-                    external_path,
-                )
-                return external_path
-            except Exception as error:
-                errors.append(error)
-                if external_path:
-                    with contextlib.suppress(Exception):
-                        os.remove(external_path)
-                raise AssistantErr(
-                    "فشلت جميع مسارات YouTube والتنزيل المحلي، ثم فشل "
-                    f"بوت التحميل الخارجي أيضاً في توفير {media_label}. "
-                    f"التفاصيل: {str(error).replace(chr(10), ' ')[-400:]}"
-                ) from error
+            retries = max(
+                1, int(getattr(config, "TELEGRAM_MEDIA_FALLBACK_RETRIES", 3))
+            )
+            retry_delay = max(
+                0, int(getattr(config, "TELEGRAM_MEDIA_FALLBACK_RETRY_DELAY", 3))
+            )
+            last_external_error = None
+            for retry_index in range(1, retries + 1):
+                external_path = None
+                try:
+                    LOGGER(__name__).warning(
+                        "External Telegram downloader attempt %s/%s "
+                        "chat_id=%s mode=%s",
+                        retry_index,
+                        retries,
+                        chat_id,
+                        media_kind,
+                    )
+                    external_path = await fetch_media_from_telegram_bot(
+                        fallback_client,
+                        source_chat_id=external_chat_id,
+                        bot_username=external_bot,
+                        command=command,
+                        link=link,
+                        request_chat_id=chat_id,
+                        response_timeout=getattr(
+                            config,
+                            "TELEGRAM_MEDIA_FALLBACK_RESPONSE_TIMEOUT",
+                            180,
+                        ),
+                        download_timeout=getattr(
+                            config,
+                            "TELEGRAM_MEDIA_FALLBACK_DOWNLOAD_TIMEOUT",
+                            900,
+                        ),
+                        cleanup=getattr(
+                            config,
+                            "TELEGRAM_MEDIA_FALLBACK_CLEANUP",
+                            True,
+                        ),
+                    )
+                    await play_downloaded_file(external_path)
+                    LOGGER(__name__).info(
+                        "Streaming YouTube %s from external Telegram fallback "
+                        "chat_id=%s path=%s attempt=%s",
+                        media_kind,
+                        chat_id,
+                        external_path,
+                        retry_index,
+                    )
+                    return external_path
+                except Exception as error:
+                    last_external_error = error
+                    errors.append(error)
+                    if external_path:
+                        with contextlib.suppress(Exception):
+                            os.remove(external_path)
+                    LOGGER(__name__).warning(
+                        "External Telegram downloader failed attempt=%s/%s "
+                        "chat_id=%s: %s",
+                        retry_index,
+                        retries,
+                        chat_id,
+                        str(error).replace("\n", " ")[-400:],
+                    )
+                    if retry_index < retries and retry_delay:
+                        await asyncio.sleep(retry_delay)
+
+            raise AssistantErr(
+                "فشلت جميع مسارات YouTube والتنزيل المحلي، ثم فشل "
+                f"بوت التحميل الخارجي بعد {retries} محاولات في توفير "
+                f"{media_label}. التفاصيل: "
+                f"{str(last_external_error).replace(chr(10), ' ')[-400:]}"
+            ) from last_external_error
 
         detail = YouTube.friendly_error(errors[-1]) if errors else "سبب غير معروف"
         raise AssistantErr(
@@ -378,6 +625,7 @@ async def _play_media_with_fallback(
 
 
 async def _clear_(chat_id):
+    await _cancel_long_video_session(chat_id)
     if popped := db.pop(chat_id, None):
         await auto_clean(popped)
     db[chat_id] = []
@@ -462,6 +710,7 @@ class Call(PyTgCalls):
             await assistant.leave_call(chat_id)
 
     async def force_stop_stream(self, chat_id: int):
+        await _cancel_long_video_session(chat_id)
         assistant = await group_assistant(self, chat_id)
         with contextlib.suppress(Exception):
             check = db.get(chat_id)
@@ -574,6 +823,7 @@ class Call(PyTgCalls):
                     group_config=ksk,
                     allow_local_fallback=duration_to_seconds(duration) > 0,
                     fallback_client=app,
+                    duration=duration,
                 )
                 break
             except ChatAdminRequired:
@@ -719,6 +969,7 @@ class Call(PyTgCalls):
                             image=image,
                             allow_local_fallback=True,
                             fallback_client=app,
+                            duration=check[0].get("dur"),
                         ),
                         video=video,
                     )
@@ -925,6 +1176,8 @@ class Call(PyTgCalls):
         @self.five.on_update(fl.stream_end())
         async def stream_end_handler1(client, update: StreamEnded):
             if update.stream_type != StreamEnded.Type.AUDIO:
+                return
+            if await _continue_segmented_long_video(client, update.chat_id):
                 return
             await self.change_stream(client, update.chat_id)
 
