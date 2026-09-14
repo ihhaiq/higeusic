@@ -37,7 +37,10 @@ from pytgcalls.types import (
 import config
 from AlexaMusic import LOGGER, YouTube, app
 from AlexaMusic.misc import db
-from AlexaMusic.core.telegram_media_fallback import fetch_media_from_telegram_bot
+from AlexaMusic.core.telegram_media_fallback import (
+    fetch_media_from_telegram_bot,
+    route_telegram_media_fallback_reply,
+)
 from AlexaMusic.platforms.youtube_helpers import duration_to_seconds
 from AlexaMusic.utils.database import (
     add_active_chat,
@@ -62,6 +65,12 @@ from strings import get_string
 autoend = {}
 counter = {}
 AUTO_END_TIME = 1
+
+
+@app.on_message(group=-100)
+async def telegram_media_fallback_reply_handler(_, message):
+    """Receive external downloader replies without bot-forbidden history calls."""
+    route_telegram_media_fallback_reply(message)
 
 
 async def _video_quality_for_duration(chat_id: int, duration=None):
