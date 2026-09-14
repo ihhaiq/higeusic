@@ -1,0 +1,107 @@
+import unittest
+from types import SimpleNamespace
+
+from AlexaMusic.core.telegram_media_fallback import (
+    build_downloader_command,
+    fetch_media_from_telegram_bot,
+)
+
+
+class FakeMessage:
+    def __init__(
+        self,
+        message_id,
+        *,
+        username=None,
+        reply_to_message_id=None,
+        document=None,
+        video=None,
+        audio=None,
+        text=None,
+    ):
+        self.id = message_id
+        self.from_user = (
+            SimpleNamespace(username=username) if username is not None else None
+        )
+        self.reply_to_message_id = reply_to_message_id
+        self.reply_to_message = None
+        self.document = document
+        self.video = video
+        self.audio = audio
+        self.text = text
+        self.caption = None
+        self.deleted = False
+
+    async def delete(self):
+        self.deleted = True
+
+
+class FakeClient:
+    def __init__(self, history):
+        self.history = history
+        self.request = FakeMessage(100, username="MusicBot")
+        self.sent = None
+        self.downloaded_message = None
+
+    async def send_message(self, chat_id, text, **kwargs):
+        self.sent = (chat_id, text, kwargs)
+        return self.request
+
+    async def get_chat_history(self, chat_id, limit):
+        for message in self.history:
+            yield message
+
+    async def download_media(self, message, file_name):
+        self.downloaded_message = (message, file_name)
+        return "downloads/external-result.mp4"
+
+
+class TelegramMediaFallbackTest(unittest.IsolatedAsyncioTestCase):
+    def test_command_targets_the_external_bot(self):
+        self.assertEqual(
+            build_downloader_command(
+                "/d",
+                "@DownloaderBot",
+                "https://youtu.be/example",
+            ),
+            "/d@downloaderbot https://youtu.be/example",
+        )
+
+    async def test_only_correlated_bot_reply_is_downloaded(self):
+        unrelated = FakeMessage(
+            103,
+            username="DownloaderBot",
+            reply_to_message_id=99,
+            document=object(),
+        )
+        result = FakeMessage(
+            102,
+            username="DownloaderBot",
+            reply_to_message_id=100,
+            video=object(),
+        )
+        older = FakeMessage(100, username="MusicBot")
+        client = FakeClient([unrelated, result, older])
+
+        path = await fetch_media_from_telegram_bot(
+            client,
+            source_chat_id=-1001234567890,
+            bot_username="DownloaderBot",
+            command="/v",
+            link="https://youtu.be/example",
+            request_chat_id=-10099887766,
+            cleanup=True,
+        )
+
+        self.assertEqual(path, "downloads/external-result.mp4")
+        self.assertEqual(
+            client.sent[1],
+            "/v@downloaderbot https://youtu.be/example",
+        )
+        self.assertIs(client.downloaded_message[0], result)
+        self.assertTrue(client.request.deleted)
+        self.assertTrue(result.deleted)
+
+
+if __name__ == "__main__":
+    unittest.main()
