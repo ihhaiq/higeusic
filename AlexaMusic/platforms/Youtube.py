@@ -14,6 +14,7 @@ import asyncio
 import json
 import os
 import re
+import uuid
 from pathlib import Path
 from typing import Union
 
@@ -547,6 +548,20 @@ class YouTubeAPI:
         if not path or not os.path.isfile(path):
             raise RuntimeError("yt-dlp completed but the downloaded file was not found")
         return path
+
+    async def download_stream_video(self, link: str, *, chat_id: int) -> str:
+        """Download and merge a unique temporary MP4 for reliable call playback."""
+        unique = uuid.uuid4().hex[:10]
+        return await self._download_file(
+            link,
+            format_selector=(
+                "bestvideo[ext=mp4][height<=720]+bestaudio[ext=m4a]/"
+                "bestvideo[height<=720]+bestaudio/"
+                "best[ext=mp4][height<=720]/best[height<=720]/best"
+            ),
+            outtmpl=f"downloads/stream_{chat_id}_{unique}_%(id)s.%(ext)s",
+            merge_format="mp4",
+        )
 
     async def download(
         self,
