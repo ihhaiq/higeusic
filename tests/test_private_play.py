@@ -116,6 +116,14 @@ class PrivatePlayTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(kwargs["query"], "اسم الفيديو")
         self.calls.userbot1.get_chat.assert_awaited_once_with("music_group")
 
+    async def test_private_play_command_starts_audio_in_target(self):
+        message = self.message("/play @music_group اسم المقطع")
+        await self.handler.private_video(None, message)
+        args, kwargs = self.media.await_args
+        self.assertEqual(args[3], self.chat.id)
+        self.assertIs(args[4], False)
+        self.assertEqual(kwargs["query"], "اسم المقطع")
+
     async def test_private_command_accepts_replied_video_without_search(self):
         reply = NS(video=NS(file_id="video"), document=None, audio=None, voice=None)
         message = self.message("فيديو @music_group", reply=reply)
