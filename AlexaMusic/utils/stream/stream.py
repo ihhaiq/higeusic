@@ -96,7 +96,7 @@ async def stream(
                     db[chat_id] = []
                 status = True if video else None
                 file_path = f"https://www.youtube.com/watch?v={vidid}"
-                await Alexa.join_call(
+                local_file = await Alexa.join_call(
                     chat_id,
                     original_chat_id,
                     file_path,
@@ -107,7 +107,7 @@ async def stream(
                 await put_queue(
                     chat_id,
                     original_chat_id,
-                    f"vid_{vidid}",
+                    local_file or f"vid_{vidid}",
                     title,
                     duration_min,
                     user_name,
@@ -178,7 +178,7 @@ async def stream(
         else:
             if not forceplay:
                 db[chat_id] = []
-            await Alexa.join_call(
+            local_file = await Alexa.join_call(
                 chat_id,
                 original_chat_id,
                 file_path,
@@ -189,7 +189,7 @@ async def stream(
             await put_queue(
                 chat_id,
                 original_chat_id,
-                f"vid_{vidid}",
+                local_file or f"vid_{vidid}",
                 title,
                 duration_min,
                 user_name,
