@@ -88,6 +88,7 @@ class YouTubeHelpersTest(unittest.TestCase):
             [(attempt.strategy.value, attempt.player_client) for attempt in attempts],
             [
                 ("po_token", "mweb"),
+                ("anonymous", None),
                 ("anonymous", "web_safari"),
                 ("anonymous", "web"),
             ],
