@@ -414,7 +414,7 @@ class Call(PyTgCalls):
                     )
                     raise AssistantErr(
                         "المحادثة الصوتية تبدو مفتوحة، لكن الحساب المساعد لا يستطيع رؤيتها. "
-                        "تأكد أن الاتصال مفتوح في نفس المجموعة/القناة التي أرسلت فيها أمر التشغيل "
+                        "تأكد أن الاتصال مفتوح في المجموعة/القناة المستهدفة "
                         "وأن الحساب المساعد عضو فيها، ثم حاول مرة أخرى."
                     )
                 no_active_retried = True
@@ -507,6 +507,7 @@ class Call(PyTgCalls):
                 requester_id = check[0].get("user_id") or config.OWNER_ID
                 run = await send_stream_rich_message(
                     original_chat_id,
+                    playback_chat_id=chat_id,
                     image=img,
                     title=title,
                     is_video=str(streamtype) == "video",
@@ -555,6 +556,7 @@ class Call(PyTgCalls):
                 await mystic.delete()
                 run = await send_stream_rich_message(
                     original_chat_id,
+                    playback_chat_id=chat_id,
                     image=img,
                     title=title,
                     is_video=str(streamtype) == "video",
@@ -588,6 +590,7 @@ class Call(PyTgCalls):
                 requester_id = check[0].get("user_id") or config.OWNER_ID
                 run = await send_stream_rich_message(
                     original_chat_id,
+                    playback_chat_id=chat_id,
                     image=config.STREAM_IMG_URL,
                     title="بث مباشر من رابط",
                     is_video=str(streamtype) == "video",
@@ -635,6 +638,7 @@ class Call(PyTgCalls):
                     requester_id = check[0].get("user_id") or config.OWNER_ID
                     run = await send_stream_rich_message(
                         original_chat_id,
+                        playback_chat_id=chat_id,
                         image=(
                             config.TELEGRAM_AUDIO_URL
                             if str(streamtype) == "audio"
@@ -651,6 +655,7 @@ class Call(PyTgCalls):
                     requester_id = check[0].get("user_id") or config.OWNER_ID
                     run = await send_stream_rich_message(
                         original_chat_id,
+                        playback_chat_id=chat_id,
                         image=config.SOUNCLOUD_IMG_URL,
                         title=title,
                         is_video=False,
@@ -666,6 +671,7 @@ class Call(PyTgCalls):
                     try:
                         run = await send_stream_rich_message(
                             original_chat_id,
+                            playback_chat_id=chat_id,
                             image=img,
                             title=title,
                             is_video=str(streamtype) == "video",
@@ -677,6 +683,7 @@ class Call(PyTgCalls):
                         await asyncio.sleep(e.value)
                         run = await send_stream_rich_message(
                             original_chat_id,
+                            playback_chat_id=chat_id,
                             image=img,
                             title=title,
                             is_video=str(streamtype) == "video",

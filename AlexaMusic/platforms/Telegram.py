@@ -17,6 +17,7 @@ from typing import Union
 
 import aiohttp
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Voice
+from pyrogram.enums import ChatType
 
 import config
 from config import lyrical
@@ -43,6 +44,8 @@ class TeleAPI:
         return True
 
     async def get_link(self, message):
+        if message.chat.type == ChatType.PRIVATE:
+            return None
         if message.chat.username:
             return f"https://t.me/{message.chat.username}/{message.reply_to_message.id}"
         xf = str((message.chat.id))[4:]

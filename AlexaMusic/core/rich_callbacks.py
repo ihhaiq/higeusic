@@ -41,9 +41,26 @@ async def _language_for_chat(chat_id: int):
         return get_string("ar")
 
 
+def _private_controls_allowed(callback) -> bool:
+    message = callback.message
+    if not message or message.chat.id < 0:
+        return True
+    from AlexaMusic.misc import SUDOERS
+
+    user_id = callback.from_user.id
+    return (
+        message.chat.id == user_id
+        and user_id not in config.BANNED_USERS
+        and (user_id == config.OWNER_ID or user_id in SUDOERS)
+    )
+
+
 @dispatcher.callback_query(F.data.startswith("RICHCTRL "))
 async def open_rich_control_panel(callback: CallbackQuery) -> None:
-    if not callback.data or not callback.from_user:
+    if not callback.data or not callback.from_user or not callback.message:
+        return
+    if not _private_controls_allowed(callback):
+        await _safe_answer(callback, "التحكم من الخاص متاح لمالك البوت والمطورين المخوّلين فقط.", show_alert=True)
         return
 
     try:
@@ -71,12 +88,22 @@ async def open_rich_control_panel(callback: CallbackQuery) -> None:
         )
         return
 
+    from AlexaMusic.utils.database import is_active_chat
+
+    if not await is_active_chat(chat_id):
+        await _safe_answer(callback, "لا يوجد تشغيل فعّال لهذه المجموعة/القناة.", show_alert=True)
+        return
+
+    delivery_chat_id = callback.message.chat.id
+    if delivery_chat_id > 0:
+        await _safe_answer(callback)
     try:
         await send_control_panel_ephemeral(
             chat_id,
             receiver_user_id=user_id,
             callback_query_id=str(callback.id),
             requester_id=requester_id,
+            delivery_chat_id=delivery_chat_id,
         )
     except TelegramBadRequest as error:
         if _expired_callback(error):
@@ -120,6 +147,9 @@ class _AiogramCallbackAdapter:
 @dispatcher.callback_query(F.data.startswith("RCTRL "))
 async def handle_rich_control_action(callback: CallbackQuery) -> None:
     if not callback.data or not callback.from_user:
+        return
+    if not _private_controls_allowed(callback):
+        await _safe_answer(callback, "غير مسموح لك بالتحكم بهذا التشغيل.", show_alert=True)
         return
 
     try:

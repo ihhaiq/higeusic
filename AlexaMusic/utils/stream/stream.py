@@ -120,6 +120,7 @@ async def stream(
                 img = await gen_thumb(vidid)
                 run = await send_stream_rich_message(
                     original_chat_id,
+                    playback_chat_id=chat_id,
                     image=img,
                     title=title,
                     is_video=bool(video),
@@ -202,6 +203,7 @@ async def stream(
             try:
                 run = await send_stream_rich_message(
                     original_chat_id,
+                    playback_chat_id=chat_id,
                     image=img,
                     title=title,
                     is_video=bool(video),
@@ -252,6 +254,7 @@ async def stream(
             )
             run = await send_stream_rich_message(
                 original_chat_id,
+                playback_chat_id=chat_id,
                 image=config.SOUNCLOUD_IMG_URL,
                 title=title,
                 is_video=False,
@@ -303,6 +306,7 @@ async def stream(
                 await add_active_video_chat(chat_id)
             run = await send_stream_rich_message(
                 original_chat_id,
+                playback_chat_id=chat_id,
                 image=config.TELEGRAM_VIDEO_URL if video else config.TELEGRAM_AUDIO_URL,
                 title=title,
                 is_video=bool(video),
@@ -364,6 +368,7 @@ async def stream(
             img = await gen_thumb(vidid)
             run = await send_stream_rich_message(
                 original_chat_id,
+                playback_chat_id=chat_id,
                 image=img,
                 title=title,
                 is_video=bool(video),
@@ -416,6 +421,7 @@ async def stream(
             )
             run = await send_stream_rich_message(
                 original_chat_id,
+                playback_chat_id=chat_id,
                 image=config.STREAM_IMG_URL,
                 title="بث مباشر من رابط",
                 is_video=bool(video),
