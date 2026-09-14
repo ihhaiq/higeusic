@@ -537,50 +537,80 @@ async def _play_media_with_fallback(
                 media_kind,
                 external_chat_id,
             )
-            external_path = None
-            try:
-                external_path = await fetch_media_from_telegram_bot(
-                    fallback_client,
-                    source_chat_id=external_chat_id,
-                    bot_username=external_bot,
-                    command=command,
-                    link=link,
-                    request_chat_id=chat_id,
-                    response_timeout=getattr(
-                        config,
-                        "TELEGRAM_MEDIA_FALLBACK_RESPONSE_TIMEOUT",
-                        180,
-                    ),
-                    download_timeout=getattr(
-                        config,
-                        "TELEGRAM_MEDIA_FALLBACK_DOWNLOAD_TIMEOUT",
-                        900,
-                    ),
-                    cleanup=getattr(
-                        config,
-                        "TELEGRAM_MEDIA_FALLBACK_CLEANUP",
-                        True,
-                    ),
-                )
-                await play_downloaded_file(external_path)
-                LOGGER(__name__).info(
-                    "Streaming YouTube %s from external Telegram fallback "
-                    "chat_id=%s path=%s",
-                    media_kind,
-                    chat_id,
-                    external_path,
-                )
-                return external_path
-            except Exception as error:
-                errors.append(error)
-                if external_path:
-                    with contextlib.suppress(Exception):
-                        os.remove(external_path)
-                raise AssistantErr(
-                    "فشلت جميع مسارات YouTube والتنزيل المحلي، ثم فشل "
-                    f"بوت التحميل الخارجي أيضاً في توفير {media_label}. "
-                    f"التفاصيل: {str(error).replace(chr(10), ' ')[-400:]}"
-                ) from error
+            retries = max(
+                1, int(getattr(config, "TELEGRAM_MEDIA_FALLBACK_RETRIES", 3))
+            )
+            retry_delay = max(
+                0, int(getattr(config, "TELEGRAM_MEDIA_FALLBACK_RETRY_DELAY", 3))
+            )
+            last_external_error = None
+            for retry_index in range(1, retries + 1):
+                external_path = None
+                try:
+                    LOGGER(__name__).warning(
+                        "External Telegram downloader attempt %s/%s "
+                        "chat_id=%s mode=%s",
+                        retry_index,
+                        retries,
+                        chat_id,
+                        media_kind,
+                    )
+                    external_path = await fetch_media_from_telegram_bot(
+                        fallback_client,
+                        source_chat_id=external_chat_id,
+                        bot_username=external_bot,
+                        command=command,
+                        link=link,
+                        request_chat_id=chat_id,
+                        response_timeout=getattr(
+                            config,
+                            "TELEGRAM_MEDIA_FALLBACK_RESPONSE_TIMEOUT",
+                            180,
+                        ),
+                        download_timeout=getattr(
+                            config,
+                            "TELEGRAM_MEDIA_FALLBACK_DOWNLOAD_TIMEOUT",
+                            900,
+                        ),
+                        cleanup=getattr(
+                            config,
+                            "TELEGRAM_MEDIA_FALLBACK_CLEANUP",
+                            True,
+                        ),
+                    )
+                    await play_downloaded_file(external_path)
+                    LOGGER(__name__).info(
+                        "Streaming YouTube %s from external Telegram fallback "
+                        "chat_id=%s path=%s attempt=%s",
+                        media_kind,
+                        chat_id,
+                        external_path,
+                        retry_index,
+                    )
+                    return external_path
+                except Exception as error:
+                    last_external_error = error
+                    errors.append(error)
+                    if external_path:
+                        with contextlib.suppress(Exception):
+                            os.remove(external_path)
+                    LOGGER(__name__).warning(
+                        "External Telegram downloader failed attempt=%s/%s "
+                        "chat_id=%s: %s",
+                        retry_index,
+                        retries,
+                        chat_id,
+                        str(error).replace("\n", " ")[-400:],
+                    )
+                    if retry_index < retries and retry_delay:
+                        await asyncio.sleep(retry_delay)
+
+            raise AssistantErr(
+                "فشلت جميع مسارات YouTube والتنزيل المحلي، ثم فشل "
+                f"بوت التحميل الخارجي بعد {retries} محاولات في توفير "
+                f"{media_label}. التفاصيل: "
+                f"{str(last_external_error).replace(chr(10), ' ')[-400:]}"
+            ) from last_external_error
 
         detail = YouTube.friendly_error(errors[-1]) if errors else "سبب غير معروف"
         raise AssistantErr(
