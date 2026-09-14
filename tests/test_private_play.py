@@ -144,8 +144,7 @@ class PrivatePlayTests(unittest.IsolatedAsyncioTestCase):
         message.reply_text.assert_awaited_once_with(self.handler.USAGE)
         self.accounts[0].get_chat.assert_not_awaited()
 
-    async def test_private_mode_authorizes_target_not_private_chat(self):
-        self.config.PRIVATE_BOT_MODE = "True"
+    async def test_private_target_always_requires_dev_authorization(self):
         self.db.is_served_private_chat.return_value = False
         await self.handler.private_video(None, self.message())
         self.db.is_served_private_chat.assert_awaited_once_with(self.chat.id)
