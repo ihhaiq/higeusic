@@ -17,7 +17,7 @@ from AlexaMusic.utils.database import (
     is_served_private_chat,
 )
 from AlexaMusic.utils.exceptions import AssistantErr
-from AlexaMusic.utils.play_request import parse_private_video_request
+from AlexaMusic.utils.play_request import is_video_request, parse_private_video_request
 from AlexaMusic.utils.private_play import prepare_private_assistant, resolve_private_chat
 from strings import get_string
 
@@ -25,16 +25,20 @@ from .play import play_media
 
 _play_locks = defaultdict(asyncio.Lock)
 USAGE = (
-    "للتشغيل من الخاص:\n"
-    "فيديو @المجموعة رابط_الفيديو أو اسم_الفيديو\n\n"
-    "أو أرسل ملف فيديو ورد عليه بـ: فيديو @المجموعة\n"
-    "يمكن استخدام آيدي المجموعة/القناة السالب بدل اليوزر.\n"
-    "الحساب المساعد يجب أن يكون عضواً ومسموحاً له بالبث، والمكالمة مفتوحة."
+    "للتشغيل من خاص البوت إلى مجموعة أو قناة:\n\n"
+    "للصوت: /play @المجموعة اسم_المقطع أو الرابط\n"
+    "للفيديو: فيديو @المجموعة اسم_الفيديو أو الرابط\n\n"
+    "ويمكنك الرد على ملف بالأمر مع الوجهة فقط. يقبل آيدي الوجهة السالب أيضاً.\n"
+    "لا يشترط وجود البوت داخل الوجهة؛ يجب أن يكون الحساب المساعد عضواً، "
+    "والمكالمة مفتوحة، ولديه صلاحية بث الصوت والفيديو."
 )
 
 
 @app.on_message(
-    (filters.command(["vplay", "فيديو"]) | filters.command(["فيديو"], prefixes=""))
+    (
+        filters.command(["play", "vplay", "فيديو"])
+        | filters.command(["فيديو"], prefixes="")
+    )
     & filters.private
     & ~config.BANNED_USERS
 )
@@ -43,6 +47,7 @@ async def private_video(client, message):
         message.from_user.id != config.OWNER_ID and message.from_user.id not in SUDOERS
     ):
         return await message.reply_text("التشغيل من الخاص متاح لمالك البوت والمطورين المخوّلين فقط.")
+    video = is_video_request(message)
     try:
         request = parse_private_video_request(message)
     except ValueError:
@@ -66,7 +71,7 @@ async def private_video(client, message):
             await getattr(Alexa, f"userbot{number}").get_chat(chat.username or chat.id)
             language = get_string(await get_lang(message.chat.id))
             await play_media(
-                client, message, language, chat.id, True, chat.title,
+                client, message, language, chat.id, video, chat.title,
                 "Direct", url, None, query=request.query,
             )
     except AssistantErr as error:
@@ -75,4 +80,7 @@ async def private_video(client, message):
         await message.reply_text(f"تيليجرام طلب الانتظار {error.value} ثانية. حاول بعدها.")
     except Exception as error:
         LOGGER(__name__).exception("Private video playback failed")
-        await message.reply_text(f"تعذر بدء التشغيل من الخاص ({type(error).__name__}).")
+        await message.reply_text(
+            "تعذر بدء التشغيل من الخاص بسبب خطأ داخلي "
+            f"({type(error).__name__}). راجع سجل Railway لمعرفة المرحلة التي فشلت."
+        )
