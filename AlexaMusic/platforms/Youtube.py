@@ -3,7 +3,7 @@
 """YouTube lookup, streaming URL extraction, and optional media downloads.
 
 All yt-dlp operations use the same isolated fallback order:
-mweb PO Token -> anonymous public clients -> optional Cookies last.
+mweb PO Token -> yt-dlp default -> public clients -> optional Cookies last.
 No per-chat state is stored here, so concurrent calls cannot change each
 other's authentication mode or queue state.
 """
@@ -42,7 +42,23 @@ class YouTubeExtractionError(RuntimeError):
     def __init__(self, errors: list[tuple[YouTubeAttempt, Exception]]):
         self.errors = errors
         last_error = errors[-1][1] if errors else RuntimeError("YouTube extraction failed")
-        super().__init__(friendly_youtube_error(last_error))
+        categories = {classify_youtube_error(error) for _, error in errors}
+        if "private" in categories or "age_restricted" in categories:
+            message = friendly_youtube_error(last_error)
+        elif "rate_limited" in categories:
+            message = (
+                "فرض YouTube حداً مؤقتاً على طلبات سيرفر Railway (429). "
+                "هذه ليست مشكلة في المكالمة؛ انتظر قليلاً ثم أعد المحاولة."
+            )
+        elif categories & {"cookies_rejected", "http_403", "po_token_failed"}:
+            message = (
+                "رفض YouTube الاستخراج من عنوان سيرفر Railway. جُرّب PO Token، "
+                "وإعداد yt-dlp الافتراضي، والعملاء البدلاء، وCookies الاختيارية "
+                "ولم ينجح أي مسار."
+            )
+        else:
+            message = friendly_youtube_error(last_error)
+        super().__init__(message)
 
 
 def cookiefile() -> str | None:
@@ -93,12 +109,14 @@ class YouTubeAPI:
                     "youtube:player_client=default,web_embedded",
                 ]
             )
-        elif attempt.strategy is YouTubeAuthStrategy.ANONYMOUS:
-            client = attempt.player_client or "web_safari"
+        elif (
+            attempt.strategy is YouTubeAuthStrategy.ANONYMOUS
+            and attempt.player_client
+        ):
             args.extend(
                 [
                     "--extractor-args",
-                    f"youtube:player_client={client}",
+                    f"youtube:player_client={attempt.player_client}",
                 ]
             )
         return args
@@ -117,7 +135,7 @@ class YouTubeAPI:
         else:
             LOGGER(__name__).info(
                 "Using anonymous YouTube client=%s operation=%s%s",
-                attempt.player_client or "web_safari",
+                attempt.player_client or "yt-dlp-default",
                 operation,
                 chat_context,
             )
@@ -159,7 +177,7 @@ class YouTubeAPI:
         else:
             LOGGER(__name__).warning(
                 "Anonymous YouTube attempt failed client=%s operation=%s%s category=%s: %s",
-                attempt.player_client or "web_safari",
+                attempt.player_client or "yt-dlp-default",
                 operation,
                 chat_context,
                 category,
