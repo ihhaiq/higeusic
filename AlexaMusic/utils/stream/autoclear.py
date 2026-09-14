@@ -20,7 +20,10 @@ async def auto_clean(popped):
         try:
             rem = popped_item.get("file")
             if rem:
-                autoclean.discard(rem)
+                try:
+                    autoclean.remove(rem)
+                except ValueError:
+                    pass
                 if all(keyword not in rem for keyword in ("vid_", "live_", "index_")):
                     try:
                         os.remove(rem)
