@@ -172,6 +172,21 @@ async def _play_media_with_fallback(
                     chat_id=chat_id,
                 )
                 continue
+        if video and audio_link and allow_local_fallback:
+            # PyTgCalls can accept separate DASH inputs without raising while
+            # only the video track reaches Telegram.  For finite videos, skip
+            # that silent-success path and let yt-dlp merge both tracks into a
+            # temporary file below.
+            errors.append(
+                RuntimeError("Separate YouTube audio/video streams require local merging")
+            )
+            LOGGER(__name__).warning(
+                "Separate YouTube A/V streams detected; using local merge "
+                "chat_id=%s strategy=%s",
+                chat_id,
+                attempt.strategy.value,
+            )
+            continue
         stream = _media_stream(
             stream_link,
             audio_link=audio_link,

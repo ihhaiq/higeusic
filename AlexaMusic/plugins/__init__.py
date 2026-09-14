@@ -38,6 +38,7 @@ ALL_MODULES = [
     ".sudo.autoend",
     ".sudo.blacklistchat",
     ".sudo.block",
+    ".sudo.dev",
     ".sudo.logger",
     ".sudo.maintenance",
     ".sudo.private",
