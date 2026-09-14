@@ -1,10 +1,19 @@
+import importlib.util
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 
-from AlexaMusic.core.telegram_media_fallback import (
-    build_downloader_command,
-    fetch_media_from_telegram_bot,
+
+MODULE_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "AlexaMusic/core/telegram_media_fallback.py"
 )
+SPEC = importlib.util.spec_from_file_location("telegram_media_fallback", MODULE_PATH)
+telegram_fallback = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(telegram_fallback)
+
+build_downloader_command = telegram_fallback.build_downloader_command
+fetch_media_from_telegram_bot = telegram_fallback.fetch_media_from_telegram_bot
 
 
 class FakeMessage:
