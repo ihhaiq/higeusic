@@ -140,7 +140,7 @@ async def _play_media_with_fallback(
     image=None,
     group_config=None,
     allow_local_fallback=False,
-    telegram_client=None,
+    fallback_client=None,
 ):
     youtube = isinstance(link, str) and YouTube.is_youtube_url(link)
     LOGGER(__name__).info(
@@ -276,7 +276,7 @@ async def _play_media_with_fallback(
         ).strip()
 
         if external_enabled:
-            if telegram_client is None or not external_chat_id or not external_bot:
+            if fallback_client is None or not external_chat_id or not external_bot:
                 raise AssistantErr(
                     "مسار بوت التحميل الخارجي مفعّل، لكن إعداداته ناقصة. "
                     "تحقق من TELEGRAM_MEDIA_FALLBACK_CHAT_ID و"
@@ -298,7 +298,7 @@ async def _play_media_with_fallback(
             external_path = None
             try:
                 external_path = await fetch_media_from_telegram_bot(
-                    telegram_client,
+                    fallback_client,
                     source_chat_id=external_chat_id,
                     bot_username=external_bot,
                     command=command,
@@ -412,19 +412,6 @@ class Call(PyTgCalls):
         self.five = PyTgCalls(
             self.userbot5,
             cache_duration=2,
-        )
-
-    def _telegram_client_for(self, player):
-        pairs = (
-            (self.one, self.userbot1),
-            (self.two, self.userbot2),
-            (self.three, self.userbot3),
-            (self.four, self.userbot4),
-            (self.five, self.userbot5),
-        )
-        return next(
-            (telegram_client for call_client, telegram_client in pairs if player is call_client),
-            None,
         )
 
     async def pause_stream(self, chat_id: int):
@@ -561,7 +548,7 @@ class Call(PyTgCalls):
                     image=image,
                     group_config=ksk,
                     allow_local_fallback=duration_to_seconds(duration) > 0,
-                    telegram_client=self._telegram_client_for(assistant),
+                    fallback_client=app,
                 )
                 break
             except ChatAdminRequired:
@@ -703,7 +690,7 @@ class Call(PyTgCalls):
                         video=video,
                         image=image,
                         allow_local_fallback=True,
-                        telegram_client=self._telegram_client_for(client),
+                        fallback_client=app,
                     )
                     if local_file:
                         check[0]["file"] = local_file
