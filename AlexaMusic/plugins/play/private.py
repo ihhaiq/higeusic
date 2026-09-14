@@ -63,8 +63,10 @@ async def private_video(client, message):
         chat = await resolve_private_chat(request.target)
         if chat.id in await blacklisted_chats():
             return await message.reply_text("هذه المجموعة/القناة محظورة من استخدام البوت.")
-        if config.PRIVATE_BOT_MODE == str(True) and not await is_served_private_chat(chat.id):
-            return await message.reply_text("خوّل المجموعة/القناة في وضع البوت الخاص أولاً.")
+        if not await is_served_private_chat(chat.id):
+            return await message.reply_text(
+                "هذه المجموعة/القناة غير مصرحة. أضفها أولاً من /dev ← إضافة قناة."
+            )
         async with _play_locks[chat.id]:
             number = await prepare_private_assistant(chat)
             # The call engine has its own Pyrogram client and peer cache.
