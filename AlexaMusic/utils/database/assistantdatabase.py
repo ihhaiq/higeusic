@@ -20,6 +20,16 @@ db = mongodb.assistants
 assistantdict = {}
 
 
+async def bind_assistant(chat_id: int, assistant: int):
+    """Persist an already checked assistant for this destination only."""
+    await db.update_one(
+        {"chat_id": chat_id},
+        {"$set": {"assistant": assistant}},
+        upsert=True,
+    )
+    assistantdict[chat_id] = assistant
+
+
 async def get_client(assistant: int):
     if assistant == 1:
         return userbot.one

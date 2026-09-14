@@ -13,6 +13,7 @@ import random
 import string
 
 from pyrogram import filters
+from pyrogram.enums import ChatType
 from pyrogram.types import InlineKeyboardMarkup, InputMediaPhoto, Message
 from pytgcalls.exceptions import NoActiveGroupCall
 
@@ -54,6 +55,14 @@ async def play_commnd(
     playmode,
     url,
     fplay,
+):
+    return await play_media(
+        client, message, _, chat_id, video, channel, playmode, url, fplay
+    )
+
+
+async def play_media(
+    client, message, _, chat_id, video, channel, playmode, url, fplay, *, query=None
 ):
     mystic = await message.reply_text(
         _["play_2"].format(channel) if channel else _["play_1"]
@@ -118,7 +127,7 @@ async def play_commnd(
             return await mystic.delete()
         return
     elif video_telegram:
-        if not await is_video_allowed(message.chat.id):
+        if not await is_video_allowed(chat_id):
             return await mystic.edit_text(_["play_3"])
         if message.reply_to_message.document:
             try:
@@ -301,18 +310,19 @@ async def play_commnd(
                 return await mystic.edit_text(err)
             return await mystic.delete()
         else:
-            try:
-                await Alexa.stream_call(url)
-            except NoActiveGroupCall:
-                await mystic.edit_text(
-                    "لا توجد مكالمة صوتية فعالة أو تعذر بدء البث. افتح المكالمة ثم حاول مرة أخرى."
-                )
-                return await app.send_message(
-                    config.LOG_GROUP_ID,
-                    "يرجى تشغيل المحادثة الصوتية/الفيديو قبل محاولة بث الرابط.",
-                )
-            except Exception as e:
-                return await mystic.edit_text(_["general_3"].format(type(e).__name__))
+            if message.chat.type != ChatType.PRIVATE:
+                try:
+                    await Alexa.stream_call(url)
+                except NoActiveGroupCall:
+                    await mystic.edit_text(
+                        "لا توجد مكالمة صوتية فعالة أو تعذر بدء البث. افتح المكالمة ثم حاول مرة أخرى."
+                    )
+                    return await app.send_message(
+                        config.LOG_GROUP_ID,
+                        "يرجى تشغيل المحادثة الصوتية/الفيديو قبل محاولة بث الرابط.",
+                    )
+                except Exception as e:
+                    return await mystic.edit_text(_["general_3"].format(type(e).__name__))
             await mystic.edit_text(_["str_2"])
             try:
                 await stream(
@@ -333,14 +343,15 @@ async def play_commnd(
                 return await mystic.edit_text(err)
             return await play_logs(message, streamtype="M3u8 or Index Link")
     else:
-        if len(message.command) < 2:
+        if query is None and len(message.command) < 2:
             buttons = botplaylist_markup(_)
             return await mystic.edit_text(
                 _["playlist_1"],
                 reply_markup=InlineKeyboardMarkup(buttons),
             )
         slider = True
-        query = message.text.split(None, 1)[1]
+        if query is None:
+            query = message.text.split(None, 1)[1]
         if "-v" in query:
             query = query.replace("-v", "")
         try:
@@ -365,6 +376,10 @@ async def play_commnd(
                             details["duration_min"],
                         )
                     )
+            elif message.chat.type == ChatType.PRIVATE:
+                # The private command already selects video and its target.
+                # Legacy live-confirmation callbacks resolve a group cplay map.
+                streamtype = "live"
             else:
                 buttons = livestream_markup(
                     _,

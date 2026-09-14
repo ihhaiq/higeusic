@@ -181,6 +181,7 @@ async def _handle_rich_control_action(
 
         run = await send_stream_rich_message(
             original_chat_id,
+            playback_chat_id=chat_id,
             image=image,
             title=title,
             is_video=is_video,
@@ -435,6 +436,7 @@ async def del_back_playlist(client, CallbackQuery, _):
             img = await gen_thumb(videoid)
             run = await send_stream_rich_message(
                 original_chat_id,
+                playback_chat_id=chat_id,
                 image=img,
                 title=title,
                 is_video=str(streamtype) == "video",
@@ -466,6 +468,7 @@ async def del_back_playlist(client, CallbackQuery, _):
             img = await gen_thumb(videoid)
             run = await send_stream_rich_message(
                 original_chat_id,
+                playback_chat_id=chat_id,
                 image=img,
                 title=title,
                 is_video=str(streamtype) == "video",
@@ -484,6 +487,7 @@ async def del_back_playlist(client, CallbackQuery, _):
                 return await CallbackQuery.message.reply_text(_["call_9"])
             run = await send_stream_rich_message(
                 original_chat_id,
+                playback_chat_id=chat_id,
                 image=STREAM_IMG_URL,
                 title="بث مباشر من رابط",
                 is_video=str(streamtype) == "video",
@@ -501,6 +505,7 @@ async def del_back_playlist(client, CallbackQuery, _):
             if videoid == "telegram":
                 run = await send_stream_rich_message(
                     original_chat_id,
+                    playback_chat_id=chat_id,
                     image=(
                         TELEGRAM_AUDIO_URL
                         if str(streamtype) == "audio"
@@ -516,6 +521,7 @@ async def del_back_playlist(client, CallbackQuery, _):
             elif videoid == "soundcloud":
                 run = await send_stream_rich_message(
                     original_chat_id,
+                    playback_chat_id=chat_id,
                     image=(
                         SOUNCLOUD_IMG_URL
                         if str(streamtype) == "audio"
@@ -533,6 +539,7 @@ async def del_back_playlist(client, CallbackQuery, _):
                 img = await gen_thumb(videoid)
                 run = await send_stream_rich_message(
                     original_chat_id,
+                    playback_chat_id=chat_id,
                     image=img,
                     title=title,
                     is_video=str(streamtype) == "video",

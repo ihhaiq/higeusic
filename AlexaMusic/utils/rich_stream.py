@@ -31,9 +31,11 @@ async def send_stream_rich_message(
     title: str,
     is_video: bool,
     requester_id: int,
+    playback_chat_id: int | None = None,
     info_url: str | None = None,
     duration: str | None = None,
 ):
+    target_id = playback_chat_id if playback_chat_id is not None else chat_id
     label = "عنوان الفيديو" if is_video else "عنوان المقطع"
     blocks: list[dict[str, Any]] = [
         {"type": "heading", "text": "📡 بدأ البث 💡", "size": 1},
@@ -41,8 +43,10 @@ async def send_stream_rich_message(
         {"type": "photo", "photo": InputMediaPhoto(media=_media(image), parse_mode=None)},
         {"type": "divider"},
         {"type": "footer", "text": f"{label}: {title}"},
-        {"type": "footer", "text": _button("قائمة التحكم", callback_data=f"RICHCTRL {chat_id}|{requester_id}", style="primary")},
+        {"type": "footer", "text": _button("قائمة التحكم", callback_data=f"RICHCTRL {target_id}|{requester_id}", style="primary")},
     ]
+    if target_id != chat_id:
+        blocks.insert(-1, {"type": "footer", "text": f"وجهة البث: {target_id}"})
     if info_url:
         blocks.append({"type": "footer", "text": {"type": "url", "text": "معلومات أكثر", "url": info_url}})
     else:
@@ -61,7 +65,9 @@ async def send_control_panel_ephemeral(
     receiver_user_id: int,
     callback_query_id: str,
     requester_id: int,
+    delivery_chat_id: int | None = None,
 ):
+    destination = delivery_chat_id if delivery_chat_id is not None else chat_id
     def action(text: str, command: str, style: str | None = None):
         return {"text": _button(text, callback_data=f"RCTRL {command}|{chat_id}|{requester_id}", style=style), "align": "center", "valign": "middle"}
 
@@ -74,6 +80,7 @@ async def send_control_panel_ephemeral(
     ]
     rich = InputRichMessage(blocks=[
         {"type": "heading", "text": "🎛 قائمة التحكم", "size": 2},
+        *([{"type": "footer", "text": f"وجهة البث: {chat_id}"}] if destination != chat_id else []),
         {"type": "divider"},
         {"type": "table", "cells": rows, "is_bordered": True, "is_compact": True},
     ])
@@ -84,7 +91,7 @@ async def send_control_panel_ephemeral(
     )
     async with Bot(token=config.BOT_TOKEN) as bot:
         return await bot.send_rich_message(
-            chat_id=chat_id,
+            chat_id=destination,
             rich_message=rich,
-            ephemeral_message_parameters=ephemeral,
+            ephemeral_message_parameters=ephemeral if destination < 0 else None,
         )

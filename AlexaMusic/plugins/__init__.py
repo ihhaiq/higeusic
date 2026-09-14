@@ -32,6 +32,7 @@ ALL_MODULES = [
     ".play.play",
     ".play.playlist",
     ".play.playmode",
+    ".play.private",
     ".play.stream",
     ".play.toptracks",
     ".sudo.autoend",
