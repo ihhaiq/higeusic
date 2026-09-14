@@ -477,8 +477,10 @@ class YouTubeAPI:
             "title": title,
             "link": yturl,
             "vidid": vidid,
+            "duration": duration,
             "duration_min": duration_min,
             "thumb": self._thumbnail(info),
+            "view_count": int(info.get("view_count") or 0),
             "cookiefile": cookiefile(),
         }
         return track_details, vidid

@@ -53,6 +53,7 @@ from AlexaMusic.utils.database import (
     set_loop,
 )
 from AlexaMusic.utils.exceptions import AssistantErr
+from AlexaMusic.utils.playback_progress import run_with_progress
 from AlexaMusic.utils.rich_stream import send_stream_rich_message
 from AlexaMusic.utils.stream.autoclear import auto_clean
 from AlexaMusic.utils.thumbnails import gen_thumb
@@ -697,16 +698,20 @@ class Call(PyTgCalls):
                             image = await YouTube.thumbnail(videoid, True)
                         except Exception:
                             image = None
-                    local_file = await _play_media_with_fallback(
-                        client,
-                        chat_id,
-                        file_path,
-                        audio_quality=audio_stream_quality,
-                        video_quality=video_stream_quality,
+                    local_file = await run_with_progress(
+                        mystic,
+                        _play_media_with_fallback(
+                            client,
+                            chat_id,
+                            file_path,
+                            audio_quality=audio_stream_quality,
+                            video_quality=video_stream_quality,
+                            video=video,
+                            image=image,
+                            allow_local_fallback=True,
+                            fallback_client=app,
+                        ),
                         video=video,
-                        image=image,
-                        allow_local_fallback=True,
-                        fallback_client=app,
                     )
                     if local_file:
                         check[0]["file"] = local_file
