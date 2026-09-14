@@ -1,6 +1,7 @@
 """Owner panel for the playback destination allowlist."""
 
 from pyrogram import filters
+from pyrogram.enums import ChatType
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 import config
@@ -16,6 +17,7 @@ from AlexaMusic.utils.private_play import resolve_private_chat
 
 
 _pending_actions: dict[int, str] = {}
+_ALLOWED_CHAT_TYPES = {ChatType.GROUP, ChatType.SUPERGROUP, ChatType.CHANNEL}
 
 
 def _is_developer(user_id: int | None) -> bool:
@@ -41,6 +43,23 @@ def _back_button() -> InlineKeyboardMarkup:
     )
 
 
+def _normalize_target(target: str):
+    value = str(target).strip()
+    return int(value) if value.lstrip("-").isdigit() else value
+
+
+async def _resolve_authorization_chat(target: str):
+    """Resolve with the admin bot first; the assistant is only a fallback."""
+    value = _normalize_target(target)
+    try:
+        chat = await app.get_chat(value)
+    except Exception:
+        chat = await resolve_private_chat(value)
+    if chat.type not in _ALLOWED_CHAT_TYPES:
+        raise ValueError("الوجهة ليست مجموعة أو قناة")
+    return chat
+
+
 async def _authorized_list() -> str:
     rows = await get_private_served_chats()
     chat_ids = sorted(int(row["chat_id"]) for row in rows)
@@ -50,7 +69,7 @@ async def _authorized_list() -> str:
     lines = ["القنوات والمجموعات المصرحة:"]
     for index, chat_id in enumerate(chat_ids, start=1):
         try:
-            chat = await resolve_private_chat(str(chat_id))
+            chat = await _resolve_authorization_chat(str(chat_id))
             title = chat.title or str(chat_id)
         except Exception:
             title = "غير متاحة للحساب المساعد"
@@ -60,12 +79,13 @@ async def _authorized_list() -> str:
 
 async def _change_authorization(message, action: str, target: str) -> None:
     try:
-        chat = await resolve_private_chat(target)
+        chat = await _resolve_authorization_chat(target)
     except Exception as error:
+        detail = str(error).strip() or type(error).__name__
         await message.reply_text(
             "تعذر العثور على المجموعة/القناة. أرسل @المعرف أو الآيدي السالب، "
-            "وتأكد أن الحساب المساعد عضو فيها. "
-            f"({type(error).__name__})"
+            "وتأكد أن البوت يستطيع الوصول إليها.\n"
+            f"السبب: {detail}"
         )
         return
 
