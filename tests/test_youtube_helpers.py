@@ -58,7 +58,7 @@ class YouTubeHelpersTest(unittest.TestCase):
             with self.subTest(value=value):
                 self.assertEqual(helpers.parse_player_clients(value), ("mweb",))
 
-    def test_auth_attempt_order_with_cookies(self):
+    def test_public_fallbacks_run_before_cookies(self):
         attempts = helpers.build_attempts(
             pot_enabled=True,
             has_cookies=True,
@@ -68,26 +68,44 @@ class YouTubeHelpersTest(unittest.TestCase):
             [(attempt.strategy.value, attempt.player_client) for attempt in attempts],
             [
                 ("po_token", "mweb"),
-                ("po_token", "web_safari"),
-                ("po_token", "tv"),
-                ("po_token", "web"),
+                ("anonymous", "web_safari"),
+                ("anonymous", "tv"),
+                ("anonymous", "web"),
                 ("cookies", None),
-                ("anonymous", None),
             ],
         )
-        self.assertFalse(any(attempt.use_cookies for attempt in attempts[:4]))
-        self.assertTrue(attempts[4].use_cookies)
-        self.assertFalse(attempts[-1].use_plugins)
+        self.assertFalse(any(attempt.use_cookies for attempt in attempts[:-1]))
+        self.assertTrue(attempts[-1].use_cookies)
 
-    def test_po_token_attempts_include_client_name(self):
+    def test_po_token_is_limited_to_mweb(self):
         attempts = helpers.build_attempts(
             pot_enabled=True,
             has_cookies=False,
-            player_clients="mweb,web",
+            player_clients="mweb,web_safari,web",
         )
         self.assertEqual(
-            [attempt.player_client for attempt in attempts[:-1]],
-            ["mweb", "web"],
+            [(attempt.strategy.value, attempt.player_client) for attempt in attempts],
+            [
+                ("po_token", "mweb"),
+                ("anonymous", "web_safari"),
+                ("anonymous", "web"),
+            ],
+        )
+
+    def test_without_po_token_all_clients_are_anonymous(self):
+        attempts = helpers.build_attempts(
+            pot_enabled=False,
+            has_cookies=False,
+            player_clients="mweb,web_safari,tv,web",
+        )
+        self.assertEqual(
+            [(attempt.strategy.value, attempt.player_client) for attempt in attempts],
+            [
+                ("anonymous", "mweb"),
+                ("anonymous", "web_safari"),
+                ("anonymous", "tv"),
+                ("anonymous", "web"),
+            ],
         )
 
     def test_cookie_attempt_depends_on_cookie_file_existence(self):
@@ -96,6 +114,7 @@ class YouTubeHelpersTest(unittest.TestCase):
             attempts = helpers.build_attempts(
                 pot_enabled=False,
                 has_cookies=helpers.cookie_file_available(path),
+                player_clients="web_safari",
             )
             self.assertEqual(
                 [attempt.strategy.value for attempt in attempts],
@@ -109,18 +128,17 @@ class YouTubeHelpersTest(unittest.TestCase):
             attempts = helpers.build_attempts(
                 pot_enabled=False,
                 has_cookies=helpers.cookie_file_available(path),
+                player_clients="web_safari",
             )
             self.assertEqual(
                 [attempt.strategy.value for attempt in attempts],
-                ["cookies", "anonymous"],
+                ["anonymous", "cookies"],
             )
 
-    def test_anonymous_is_always_last(self):
+    def test_cookies_are_always_last_when_available(self):
         combinations = (
             (True, True),
-            (True, False),
             (False, True),
-            (False, False),
         )
         for pot_enabled, has_cookies in combinations:
             with self.subTest(pot_enabled=pot_enabled, has_cookies=has_cookies):
@@ -129,7 +147,7 @@ class YouTubeHelpersTest(unittest.TestCase):
                     has_cookies=has_cookies,
                     player_clients="mweb,web_safari,tv,web",
                 )
-                self.assertEqual(attempts[-1].strategy.value, "anonymous")
+                self.assertEqual(attempts[-1].strategy.value, "cookies")
 
     def test_stream_unavailable_has_safe_user_message(self):
         message = helpers.friendly_youtube_error(
@@ -153,6 +171,9 @@ class YouTubeHelpersTest(unittest.TestCase):
             "Video unavailable": "unavailable",
             "No audio source found on direct URL": "stream_unavailable",
             "No video source found on direct URL": "stream_unavailable",
+            "HTTP Error 403: Forbidden": "http_403",
+            "HTTP Error 429: Too Many Requests": "rate_limited",
+            "PO Token provider unavailable": "po_token_failed",
         }
         for message, expected in cases.items():
             with self.subTest(message=message):
@@ -162,7 +183,7 @@ class YouTubeHelpersTest(unittest.TestCase):
         message = helpers.friendly_youtube_error(
             "Sign in to confirm you're not a bot: very long yt-dlp details"
         )
-        self.assertIn("Cookies صالحة", message)
+        self.assertIn("المسارات العامة", message)
         self.assertNotIn("yt-dlp details", message)
 
 

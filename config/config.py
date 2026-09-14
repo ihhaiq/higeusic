@@ -65,7 +65,7 @@ def _env_bool(name: str, default: bool) -> bool:
     return getenv(name, str(default)).strip().lower() in {"1", "true", "yes", "on"}
 
 
-# YouTube extraction order: PO Token, Cookies (when present), then anonymous.
+# YouTube extraction order: mweb PO Token, public anonymous clients, Cookies last.
 YOUTUBE_POT_ENABLED = _env_bool("YOUTUBE_POT_ENABLED", True)
 YOUTUBE_POT_PROVIDER_URL = getenv(
     "YOUTUBE_POT_PROVIDER_URL", "http://127.0.0.1:4416"
