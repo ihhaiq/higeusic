@@ -80,6 +80,33 @@ YOUTUBE_COOKIES_FILE = (
 )
 YOUTUBE_EXTRACT_TIMEOUT = max(10, int(getenv("YOUTUBE_EXTRACT_TIMEOUT", "45")))
 
+
+# Optional last-resort path: ask a Telegram downloader bot for the media file.
+TELEGRAM_MEDIA_FALLBACK_ENABLED = _env_bool(
+    "TELEGRAM_MEDIA_FALLBACK_ENABLED", False
+)
+TELEGRAM_MEDIA_FALLBACK_CHAT_ID = int(
+    getenv("TELEGRAM_MEDIA_FALLBACK_CHAT_ID", "0") or 0
+)
+TELEGRAM_MEDIA_FALLBACK_BOT = (
+    getenv("TELEGRAM_MEDIA_FALLBACK_BOT", "") or ""
+).strip().lstrip("@")
+TELEGRAM_MEDIA_FALLBACK_AUDIO_COMMAND = (
+    getenv("TELEGRAM_MEDIA_FALLBACK_AUDIO_COMMAND", "/d") or "/d"
+).strip()
+TELEGRAM_MEDIA_FALLBACK_VIDEO_COMMAND = (
+    getenv("TELEGRAM_MEDIA_FALLBACK_VIDEO_COMMAND", "/v") or "/v"
+).strip()
+TELEGRAM_MEDIA_FALLBACK_RESPONSE_TIMEOUT = max(
+    10, int(getenv("TELEGRAM_MEDIA_FALLBACK_RESPONSE_TIMEOUT", "180"))
+)
+TELEGRAM_MEDIA_FALLBACK_DOWNLOAD_TIMEOUT = max(
+    60, int(getenv("TELEGRAM_MEDIA_FALLBACK_DOWNLOAD_TIMEOUT", "900"))
+)
+TELEGRAM_MEDIA_FALLBACK_CLEANUP = _env_bool(
+    "TELEGRAM_MEDIA_FALLBACK_CLEANUP", True
+)
+
 # Long videos are streamed directly and capped to protect concurrent Railway calls.
 LONG_VIDEO_THRESHOLD_MIN = max(0, int(getenv("LONG_VIDEO_THRESHOLD_MIN", "30")))
 LONG_VIDEO_MAX_QUALITY = int(getenv("LONG_VIDEO_MAX_QUALITY", "480"))

@@ -54,6 +54,19 @@ class AudioLocalFallbackTest(unittest.TestCase):
 
         self.assertIn("allow_local_fallback=True", function)
 
+    def test_telegram_bot_is_the_final_fallback_client(self):
+        playback = async_function_source(
+            CALL_SOURCE,
+            "_play_media_with_fallback",
+        )
+        join_call = async_function_source(CALL_SOURCE, "join_call")
+        change_stream = async_function_source(CALL_SOURCE, "change_stream")
+
+        self.assertIn("fetch_media_from_telegram_bot", playback)
+        self.assertIn("TELEGRAM_MEDIA_FALLBACK_ENABLED", playback)
+        self.assertIn("fallback_client=app", join_call)
+        self.assertIn("fallback_client=app", change_stream)
+
 
 if __name__ == "__main__":
     unittest.main()
