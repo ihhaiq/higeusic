@@ -568,7 +568,8 @@ class Call(PyTgCalls):
                 break
             except ChatAdminRequired:
                 raise AssistantErr(
-                    "الحساب المساعد لا يملك الصلاحيات اللازمة للانضمام إلى المحادثة الصوتية."
+                    "تعذر على الحساب المساعد الانضمام إلى المحادثة الصوتية. "
+                    "تأكد أنه عضو وغير محظور؛ لا يحتاج أن يكون مشرفاً."
                 )
             except TelegramServerError:
                 raise AssistantErr(

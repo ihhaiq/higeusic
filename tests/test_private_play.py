@@ -85,6 +85,10 @@ class PrivatePlayTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await self.resolver.prepare_private_assistant(self.chat), 2)
         self.db.bind_assistant.assert_awaited_once_with(self.chat.id, 2)
 
+    async def test_plain_member_assistant_does_not_need_admin_rights(self):
+        self.accounts[0].get_chat_member.return_value.status = ChatMemberStatus.MEMBER
+        self.assertEqual(await self.resolver.prepare_private_assistant(self.chat), 1)
+
     async def test_never_reassigns_an_active_destination(self):
         self.db.is_active_chat.return_value = True
         self.accounts[0].get_chat_member.side_effect = UserNotParticipant
