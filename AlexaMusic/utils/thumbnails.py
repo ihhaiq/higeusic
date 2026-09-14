@@ -20,6 +20,48 @@ from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont, ImageOps
 from config import YOUTUBE_IMG_URL
 
 
+def _duration_seconds(metadata):
+    value = metadata.get("duration")
+    if value not in (None, "", False):
+        try:
+            return max(0, int(value))
+        except (TypeError, ValueError):
+            pass
+    parts = str(metadata.get("duration_min") or "").split(":")
+    try:
+        total = 0
+        for part in parts:
+            total = total * 60 + int(part)
+        return max(0, total)
+    except (TypeError, ValueError):
+        return 0
+
+
+async def _thumbnail_metadata(videoid, metadata=None):
+    if metadata is None:
+        from AlexaMusic import YouTube
+
+        metadata = await YouTube.info(
+            f"https://www.youtube.com/watch?v={videoid}"
+        )
+    title = re.sub(
+        r"\W+", " ", metadata.get("title") or "Unsupported Title"
+    ).title()
+    duration_seconds = _duration_seconds(metadata)
+    duration = (
+        f"{duration_seconds // 60}:{duration_seconds % 60:02d}"
+        if duration_seconds
+        else "Live"
+    )
+    thumbnail = (
+        metadata.get("thumbnail")
+        or metadata.get("thumb")
+        or YOUTUBE_IMG_URL
+    )
+    views = f"{int(metadata.get('view_count') or 0):,}"
+    return title, duration, thumbnail, views
+
+
 def changeImageSize(maxWidth, maxHeight, image):
     widthRatio = maxWidth / image.size[0]
     heightRatio = maxHeight / image.size[1]
@@ -28,24 +70,15 @@ def changeImageSize(maxWidth, maxHeight, image):
     return image.resize((newWidth, newHeight))
 
 
-async def gen_thumb(videoid):
+async def gen_thumb(videoid, metadata=None):
     if os.path.isfile(f"cache/{videoid}.png"):
         return f"cache/{videoid}.png"
 
-    url = f"https://www.youtube.com/watch?v={videoid}"
     try:
-        from AlexaMusic import YouTube
-
-        result = await YouTube.info(url)
-        title = re.sub(r"\W+", " ", result.get("title") or "Unsupported Title").title()
-        duration_seconds = int(result.get("duration") or 0)
-        duration = (
-            f"{duration_seconds // 60}:{duration_seconds % 60:02d}"
-            if duration_seconds
-            else "Live"
+        title, duration, thumbnail, views = await _thumbnail_metadata(
+            videoid,
+            metadata,
         )
-        thumbnail = result.get("thumbnail") or YOUTUBE_IMG_URL
-        views = f"{int(result.get('view_count') or 0):,}"
 
         async with aiohttp.ClientSession() as session:
             async with session.get(thumbnail) as resp:
@@ -130,24 +163,15 @@ async def gen_thumb(videoid):
         return YOUTUBE_IMG_URL
 
 
-async def gen_qthumb(videoid):
+async def gen_qthumb(videoid, metadata=None):
     if os.path.isfile(f"cache/{videoid}.png"):
         return f"cache/{videoid}.png"
 
-    url = f"https://www.youtube.com/watch?v={videoid}"
     try:
-        from AlexaMusic import YouTube
-
-        result = await YouTube.info(url)
-        title = re.sub(r"\W+", " ", result.get("title") or "Unsupported Title").title()
-        duration_seconds = int(result.get("duration") or 0)
-        duration = (
-            f"{duration_seconds // 60}:{duration_seconds % 60:02d}"
-            if duration_seconds
-            else "Live"
+        title, duration, thumbnail, views = await _thumbnail_metadata(
+            videoid,
+            metadata,
         )
-        thumbnail = result.get("thumbnail") or YOUTUBE_IMG_URL
-        views = f"{int(result.get('view_count') or 0):,}"
 
         async with aiohttp.ClientSession() as session:
             async with session.get(thumbnail) as resp:
