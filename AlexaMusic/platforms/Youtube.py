@@ -567,6 +567,15 @@ class YouTubeAPI:
             raise RuntimeError("yt-dlp completed but the downloaded file was not found")
         return path
 
+    async def download_stream_audio(self, link: str, *, chat_id: int) -> str:
+        """Download a unique temporary audio file for reliable call playback."""
+        unique = uuid.uuid4().hex[:10]
+        return await self._download_file(
+            link,
+            format_selector="bestaudio[ext=m4a]/bestaudio/best",
+            outtmpl=f"downloads/stream_{chat_id}_{unique}_%(id)s.%(ext)s",
+        )
+
     async def download_stream_video(self, link: str, *, chat_id: int) -> str:
         """Download and merge a unique temporary MP4 for reliable call playback."""
         unique = uuid.uuid4().hex[:10]
