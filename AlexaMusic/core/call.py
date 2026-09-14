@@ -201,44 +201,71 @@ async def _play_media_with_fallback(
                 chat_id=chat_id,
             )
 
-    if youtube and video and allow_local_fallback:
-        LOGGER(__name__).warning(
-            "Direct YouTube video streaming failed; downloading a temporary "
-            "merged file chat_id=%s",
+    if youtube and allow_local_fallback:
+        media_kind = "video" if video else "audio"
+        LOGGER(
+            __name__,
+        ).warning(
+            "Direct YouTube %s streaming failed; downloading a temporary file chat_id=%s",
+            media_kind,
             chat_id,
         )
         try:
-            local_path = await YouTube.download_stream_video(link, chat_id=chat_id)
+            if video:
+                local_path = await YouTube.download_stream_video(
+                    link,
+                    chat_id=chat_id,
+                )
+            else:
+                local_path = await YouTube.download_stream_audio(
+                    link,
+                    chat_id=chat_id,
+                )
         except Exception as error:
             errors.append(error)
+            media_label = "الفيديو" if video else "الصوت"
             raise AssistantErr(
-                "رفض YouTube روابط بث الفيديو المباشرة، ثم فشل البوت أيضاً "
-                "في تنزيل نسخة مؤقتة للفيديو. "
+                f"رفض YouTube روابط بث {media_label} المباشرة، ثم فشل البوت أيضاً "
+                f"في تنزيل نسخة مؤقتة من {media_label}. "
                 f"تفاصيل السبب: {YouTube.friendly_error(error)}"
             ) from error
-
         try:
             stream = _media_stream(
                 local_path,
                 audio_quality=audio_quality,
                 video_quality=video_quality,
-                video=True,
+                video=video,
                 strict=True,
             )
-            kwargs = {"config": group_config} if group_config is not None else {}
+            kwargs = (
+                {
+                    "playback_type": PlaybackMode.DIRECT,
+                    "audio_parameters": audio_quality,
+                    "video_parameters": video_quality,
+                }
+                if video
+                else {
+                    "playback_type": PlaybackMode.DIRECT,
+                    "audio_parameters": audio_quality,
+                }
+            )
             await player.play(chat_id, stream, **kwargs)
             LOGGER(__name__).info(
-                "Streaming YouTube video from temporary file chat_id=%s path=%s",
+                "Streaming YouTube %s from temporary file chat_id=%s path=%s",
+                media_kind,
                 chat_id,
                 local_path,
             )
             return local_path
         except Exception as error:
-            with contextlib.suppress(OSError):
-                os.remove(local_path)
+            try:
+                remove(local_path)
+            except Exception:
+                pass
+            media_label = "الفيديو" if video else "الصوت"
             raise AssistantErr(
-                "تم تنزيل الفيديو مؤقتاً بنجاح، لكن الحساب المساعد لم يستطع "
-                "تشغيل الملف داخل المكالمة. تحقق من صلاحية بث الفيديو ومن FFmpeg."
+                f"تم تنزيل {media_label} مؤقتاً بنجاح، لكن الحساب المساعد لم يستطع "
+                "تشغيل الملف داخل المكالمة. تحقق من صلاحيات المكالمة ومن FFmpeg."
             ) from error
 
     if errors:
@@ -441,9 +468,7 @@ class Call(PyTgCalls):
                     video=bool(video),
                     image=image,
                     group_config=ksk,
-                    allow_local_fallback=bool(
-                        video and duration_to_seconds(duration) > 0
-                    ),
+                    allow_local_fallback=duration_to_seconds(duration) > 0,
                 )
                 break
             except ChatAdminRequired:
@@ -584,7 +609,7 @@ class Call(PyTgCalls):
                         video_quality=video_stream_quality,
                         video=video,
                         image=image,
-                        allow_local_fallback=video,
+                        allow_local_fallback=True,
                     )
                     if local_file:
                         check[0]["file"] = local_file
