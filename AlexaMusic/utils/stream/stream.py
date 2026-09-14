@@ -32,6 +32,7 @@ from AlexaMusic.utils.inline.play import queue_markup
 from AlexaMusic.utils.rich_stream import send_stream_rich_message
 from AlexaMusic.utils.inline.playlist import close_markup
 from AlexaMusic.utils.pastebin import Alexabin
+from AlexaMusic.utils.playback_progress import run_with_progress
 from AlexaMusic.utils.stream.queue import put_queue, put_queue_index
 from AlexaMusic.utils.thumbnails import gen_thumb, gen_qthumb
 
@@ -96,13 +97,17 @@ async def stream(
                     db[chat_id] = []
                 status = True if video else None
                 file_path = f"https://www.youtube.com/watch?v={vidid}"
-                local_file = await Alexa.join_call(
-                    chat_id,
-                    original_chat_id,
-                    file_path,
-                    video=status,
-                    image=thumbnail,
-                    duration=duration_min,
+                local_file = await run_with_progress(
+                    mystic,
+                    Alexa.join_call(
+                        chat_id,
+                        original_chat_id,
+                        file_path,
+                        video=status,
+                        image=thumbnail,
+                        duration=duration_min,
+                    ),
+                    video=bool(video),
                 )
                 await put_queue(
                     chat_id,
@@ -117,7 +122,14 @@ async def stream(
                     forceplay=forceplay,
                 )
                 # theme = await check_theme(chat_id)
-                img = await gen_thumb(vidid)
+                img = await gen_thumb(
+                    vidid,
+                    metadata={
+                        "title": title,
+                        "duration": duration_sec,
+                        "thumb": thumbnail,
+                    },
+                )
                 run = await send_stream_rich_message(
                     original_chat_id,
                     playback_chat_id=chat_id,
@@ -165,7 +177,7 @@ async def stream(
             )
             # theme = await check_theme(chat_id)
             position = len(db.get(chat_id)) - 1
-            qimg = await gen_qthumb(vidid)
+            qimg = await gen_qthumb(vidid, metadata=result)
             button = queue_markup(_, vidid, chat_id)
             run = await app.send_photo(
                 original_chat_id,
@@ -178,13 +190,17 @@ async def stream(
         else:
             if not forceplay:
                 db[chat_id] = []
-            local_file = await Alexa.join_call(
-                chat_id,
-                original_chat_id,
-                file_path,
-                video=status,
-                image=thumbnail,
-                duration=duration_min,
+            local_file = await run_with_progress(
+                mystic,
+                Alexa.join_call(
+                    chat_id,
+                    original_chat_id,
+                    file_path,
+                    video=status,
+                    image=thumbnail,
+                    duration=duration_min,
+                ),
+                video=bool(video),
             )
             await put_queue(
                 chat_id,
@@ -199,7 +215,7 @@ async def stream(
                 forceplay=forceplay,
             )
             # theme = await check_theme(chat_id)
-            img = await gen_thumb(vidid)
+            img = await gen_thumb(vidid, metadata=result)
             try:
                 run = await send_stream_rich_message(
                     original_chat_id,
