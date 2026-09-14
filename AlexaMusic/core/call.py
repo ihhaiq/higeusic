@@ -37,6 +37,7 @@ from pytgcalls.types import (
 import config
 from AlexaMusic import LOGGER, YouTube, app
 from AlexaMusic.misc import db
+from AlexaMusic.core.telegram_media_fallback import fetch_media_from_telegram_bot
 from AlexaMusic.platforms.youtube_helpers import duration_to_seconds
 from AlexaMusic.utils.database import (
     add_active_chat,
@@ -139,6 +140,7 @@ async def _play_media_with_fallback(
     image=None,
     group_config=None,
     allow_local_fallback=False,
+    telegram_client=None,
 ):
     youtube = isinstance(link, str) and YouTube.is_youtube_url(link)
     LOGGER(__name__).info(
@@ -203,13 +205,25 @@ async def _play_media_with_fallback(
 
     if youtube and allow_local_fallback:
         media_kind = "video" if video else "audio"
-        LOGGER(
-            __name__,
-        ).warning(
+        media_label = "الفيديو" if video else "الصوت"
+
+        async def play_downloaded_file(path):
+            stream = _media_stream(
+                path,
+                audio_quality=audio_quality,
+                video_quality=video_quality,
+                video=video,
+                strict=True,
+            )
+            kwargs = {"config": group_config} if group_config is not None else {}
+            await player.play(chat_id, stream, **kwargs)
+
+        LOGGER(__name__).warning(
             "Direct YouTube %s streaming failed; downloading a temporary file chat_id=%s",
             media_kind,
             chat_id,
         )
+        local_path = None
         try:
             if video:
                 local_path = await YouTube.download_stream_video(
@@ -223,50 +237,115 @@ async def _play_media_with_fallback(
                 )
         except Exception as error:
             errors.append(error)
-            media_label = "الفيديو" if video else "الصوت"
-            raise AssistantErr(
-                f"رفض YouTube روابط بث {media_label} المباشرة، ثم فشل البوت أيضاً "
-                f"في تنزيل نسخة مؤقتة من {media_label}. "
-                f"تفاصيل السبب: {YouTube.friendly_error(error)}"
-            ) from error
-        try:
-            stream = _media_stream(
-                local_path,
-                audio_quality=audio_quality,
-                video_quality=video_quality,
-                video=video,
-                strict=True,
-            )
-            kwargs = (
-                {
-                    "playback_type": PlaybackMode.DIRECT,
-                    "audio_parameters": audio_quality,
-                    "video_parameters": video_quality,
-                }
-                if video
-                else {
-                    "playback_type": PlaybackMode.DIRECT,
-                    "audio_parameters": audio_quality,
-                }
-            )
-            await player.play(chat_id, stream, **kwargs)
-            LOGGER(__name__).info(
-                "Streaming YouTube %s from temporary file chat_id=%s path=%s",
+            LOGGER(__name__).warning(
+                "Local YouTube %s download failed chat_id=%s: %s",
                 media_kind,
                 chat_id,
-                local_path,
+                str(error).replace("\n", " ")[-500:],
             )
-            return local_path
-        except Exception as error:
+
+        if local_path:
             try:
-                remove(local_path)
-            except Exception:
-                pass
-            media_label = "الفيديو" if video else "الصوت"
-            raise AssistantErr(
-                f"تم تنزيل {media_label} مؤقتاً بنجاح، لكن الحساب المساعد لم يستطع "
-                "تشغيل الملف داخل المكالمة. تحقق من صلاحيات المكالمة ومن FFmpeg."
-            ) from error
+                await play_downloaded_file(local_path)
+                LOGGER(__name__).info(
+                    "Streaming YouTube %s from temporary file chat_id=%s path=%s",
+                    media_kind,
+                    chat_id,
+                    local_path,
+                )
+                return local_path
+            except Exception as error:
+                errors.append(error)
+                with contextlib.suppress(Exception):
+                    os.remove(local_path)
+                LOGGER(__name__).warning(
+                    "Downloaded YouTube %s could not be played chat_id=%s: %s",
+                    media_kind,
+                    chat_id,
+                    str(error).replace("\n", " ")[-500:],
+                )
+
+        external_enabled = bool(
+            getattr(config, "TELEGRAM_MEDIA_FALLBACK_ENABLED", False)
+        )
+        external_chat_id = int(
+            getattr(config, "TELEGRAM_MEDIA_FALLBACK_CHAT_ID", 0) or 0
+        )
+        external_bot = str(
+            getattr(config, "TELEGRAM_MEDIA_FALLBACK_BOT", "") or ""
+        ).strip()
+
+        if external_enabled:
+            if telegram_client is None or not external_chat_id or not external_bot:
+                raise AssistantErr(
+                    "مسار بوت التحميل الخارجي مفعّل، لكن إعداداته ناقصة. "
+                    "تحقق من TELEGRAM_MEDIA_FALLBACK_CHAT_ID و"
+                    "TELEGRAM_MEDIA_FALLBACK_BOT."
+                )
+
+            command = (
+                getattr(config, "TELEGRAM_MEDIA_FALLBACK_VIDEO_COMMAND", "/v")
+                if video
+                else getattr(config, "TELEGRAM_MEDIA_FALLBACK_AUDIO_COMMAND", "/d")
+            )
+            LOGGER(__name__).warning(
+                "Using external Telegram downloader as final fallback "
+                "chat_id=%s mode=%s source_chat_id=%s",
+                chat_id,
+                media_kind,
+                external_chat_id,
+            )
+            external_path = None
+            try:
+                external_path = await fetch_media_from_telegram_bot(
+                    telegram_client,
+                    source_chat_id=external_chat_id,
+                    bot_username=external_bot,
+                    command=command,
+                    link=link,
+                    request_chat_id=chat_id,
+                    response_timeout=getattr(
+                        config,
+                        "TELEGRAM_MEDIA_FALLBACK_RESPONSE_TIMEOUT",
+                        180,
+                    ),
+                    download_timeout=getattr(
+                        config,
+                        "TELEGRAM_MEDIA_FALLBACK_DOWNLOAD_TIMEOUT",
+                        900,
+                    ),
+                    cleanup=getattr(
+                        config,
+                        "TELEGRAM_MEDIA_FALLBACK_CLEANUP",
+                        True,
+                    ),
+                )
+                await play_downloaded_file(external_path)
+                LOGGER(__name__).info(
+                    "Streaming YouTube %s from external Telegram fallback "
+                    "chat_id=%s path=%s",
+                    media_kind,
+                    chat_id,
+                    external_path,
+                )
+                return external_path
+            except Exception as error:
+                errors.append(error)
+                if external_path:
+                    with contextlib.suppress(Exception):
+                        os.remove(external_path)
+                raise AssistantErr(
+                    "فشلت جميع مسارات YouTube والتنزيل المحلي، ثم فشل "
+                    f"بوت التحميل الخارجي أيضاً في توفير {media_label}. "
+                    f"التفاصيل: {str(error).replace(chr(10), ' ')[-400:]}"
+                ) from error
+
+        detail = YouTube.friendly_error(errors[-1]) if errors else "سبب غير معروف"
+        raise AssistantErr(
+            f"رفض YouTube روابط بث {media_label} المباشرة، ثم فشل البوت أيضاً "
+            f"في تنزيل نسخة مؤقتة من {media_label}. "
+            f"تفاصيل السبب: {detail}"
+        )
 
     if errors:
         raise AssistantErr(YouTube.friendly_error(errors[-1]))
@@ -333,6 +412,19 @@ class Call(PyTgCalls):
         self.five = PyTgCalls(
             self.userbot5,
             cache_duration=2,
+        )
+
+    def _telegram_client_for(self, player):
+        pairs = (
+            (self.one, self.userbot1),
+            (self.two, self.userbot2),
+            (self.three, self.userbot3),
+            (self.four, self.userbot4),
+            (self.five, self.userbot5),
+        )
+        return next(
+            (telegram_client for call_client, telegram_client in pairs if player is call_client),
+            None,
         )
 
     async def pause_stream(self, chat_id: int):
@@ -469,6 +561,7 @@ class Call(PyTgCalls):
                     image=image,
                     group_config=ksk,
                     allow_local_fallback=duration_to_seconds(duration) > 0,
+                    telegram_client=self._telegram_client_for(assistant),
                 )
                 break
             except ChatAdminRequired:
@@ -610,6 +703,7 @@ class Call(PyTgCalls):
                         video=video,
                         image=image,
                         allow_local_fallback=True,
+                        telegram_client=self._telegram_client_for(client),
                     )
                     if local_file:
                         check[0]["file"] = local_file
