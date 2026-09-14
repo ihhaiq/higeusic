@@ -11,6 +11,7 @@ as you want or you can collabe if you have new ideas.
 
 import asyncio
 import contextlib
+import os
 from typing import Union
 
 from ntgcalls import TelegramServerError
@@ -137,6 +138,7 @@ async def _play_media_with_fallback(
     video=False,
     image=None,
     group_config=None,
+    allow_local_fallback=False,
 ):
     youtube = isinstance(link, str) and YouTube.is_youtube_url(link)
     LOGGER(__name__).info(
@@ -187,7 +189,7 @@ async def _play_media_with_fallback(
                     attempt.strategy.value,
                     "video" if video else "audio",
                 )
-            return
+            return None
         except (YtDlpError, NoAudioSourceFound, NoVideoSourceFound) as error:
             if attempt is None:
                 raise
@@ -198,7 +200,50 @@ async def _play_media_with_fallback(
                 operation="stream",
                 chat_id=chat_id,
             )
-    raise AssistantErr(YouTube.friendly_error(errors[-1]))
+
+    if youtube and video and allow_local_fallback:
+        LOGGER(__name__).warning(
+            "Direct YouTube video streaming failed; downloading a temporary "
+            "merged file chat_id=%s",
+            chat_id,
+        )
+        try:
+            local_path = await YouTube.download_stream_video(link, chat_id=chat_id)
+        except Exception as error:
+            errors.append(error)
+            raise AssistantErr(
+                "رفض YouTube روابط بث الفيديو المباشرة، ثم فشل البوت أيضاً "
+                "في تنزيل نسخة مؤقتة للفيديو. "
+                f"تفاصيل السبب: {YouTube.friendly_error(error)}"
+            ) from error
+
+        try:
+            stream = _media_stream(
+                local_path,
+                audio_quality=audio_quality,
+                video_quality=video_quality,
+                video=True,
+                strict=True,
+            )
+            kwargs = {"config": group_config} if group_config is not None else {}
+            await player.play(chat_id, stream, **kwargs)
+            LOGGER(__name__).info(
+                "Streaming YouTube video from temporary file chat_id=%s path=%s",
+                chat_id,
+                local_path,
+            )
+            return local_path
+        except Exception as error:
+            with contextlib.suppress(OSError):
+                os.remove(local_path)
+            raise AssistantErr(
+                "تم تنزيل الفيديو مؤقتاً بنجاح، لكن الحساب المساعد لم يستطع "
+                "تشغيل الملف داخل المكالمة. تحقق من صلاحية بث الفيديو ومن FFmpeg."
+            ) from error
+
+    if errors:
+        raise AssistantErr(YouTube.friendly_error(errors[-1]))
+    raise AssistantErr("تعذر العثور على مسار وسائط صالح للتشغيل.")
 
 
 async def _clear_(chat_id):
@@ -387,7 +432,7 @@ class Call(PyTgCalls):
         no_active_retried = False
         while True:
             try:
-                await _play_media_with_fallback(
+                local_file = await _play_media_with_fallback(
                     assistant,
                     chat_id,
                     link,
@@ -396,6 +441,9 @@ class Call(PyTgCalls):
                     video=bool(video),
                     image=image,
                     group_config=ksk,
+                    allow_local_fallback=bool(
+                        video and duration_to_seconds(duration) > 0
+                    ),
                 )
                 break
             except ChatAdminRequired:
@@ -428,6 +476,7 @@ class Call(PyTgCalls):
         await music_on(chat_id)
         if video:
             await add_active_video_chat(chat_id)
+        return local_file
         # if await is_autoend():
         #     counter[chat_id] = {}
         #     users = len(await assistant.get_participants(chat_id))
@@ -527,7 +576,7 @@ class Call(PyTgCalls):
                             image = await YouTube.thumbnail(videoid, True)
                         except Exception:
                             image = None
-                    await _play_media_with_fallback(
+                    local_file = await _play_media_with_fallback(
                         client,
                         chat_id,
                         file_path,
@@ -535,7 +584,10 @@ class Call(PyTgCalls):
                         video_quality=video_stream_quality,
                         video=video,
                         image=image,
+                        allow_local_fallback=video,
                     )
+                    if local_file:
+                        check[0]["file"] = local_file
                 except AssistantErr as error:
                     return await mystic.edit_text(
                         str(error),
