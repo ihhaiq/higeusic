@@ -3,7 +3,7 @@
 """YouTube lookup, streaming URL extraction, and optional media downloads.
 
 All yt-dlp operations use the same isolated fallback order:
-PO Token player-client fallbacks -> Cookies-only -> anonymous.
+mweb PO Token -> anonymous public clients -> optional Cookies last.
 No per-chat state is stored here, so concurrent calls cannot change each
 other's authentication mode or queue state.
 """
@@ -92,6 +92,14 @@ class YouTubeAPI:
                     "youtube:player_client=default,web_embedded",
                 ]
             )
+        elif attempt.strategy is YouTubeAuthStrategy.ANONYMOUS:
+            client = attempt.player_client or "web_safari"
+            args.extend(
+                [
+                    "--extractor-args",
+                    f"youtube:player_client={client}",
+                ]
+            )
         return args
 
     def log_attempt(self, attempt: YouTubeAttempt, *, operation: str, chat_id=None):
@@ -107,7 +115,8 @@ class YouTubeAPI:
             LOGGER(__name__).info("Using Cookies operation=%s%s", operation, chat_context)
         else:
             LOGGER(__name__).info(
-                "Retrying without Cookies (Anonymous) operation=%s%s",
+                "Using anonymous YouTube client=%s operation=%s%s",
+                attempt.player_client or "web_safari",
                 operation,
                 chat_context,
             )
@@ -148,7 +157,8 @@ class YouTubeAPI:
             )
         else:
             LOGGER(__name__).warning(
-                "Anonymous YouTube attempt failed operation=%s%s category=%s: %s",
+                "Anonymous YouTube attempt failed client=%s operation=%s%s category=%s: %s",
+                attempt.player_client or "web_safari",
                 operation,
                 chat_context,
                 category,
