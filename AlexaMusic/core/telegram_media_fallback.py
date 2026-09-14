@@ -12,6 +12,11 @@ class TelegramMediaFallbackError(RuntimeError):
     """Raised when the external Telegram media fallback cannot return a file."""
 
 
+# Bot accounts cannot call messages.GetHistory. Incoming replies are routed
+# here by the bot's regular update dispatcher instead.
+_pending_replies: dict[tuple[int, int], tuple[str, asyncio.Queue[Any]]] = {}
+
+
 def normalize_bot_username(value: str | None) -> str:
     return str(value or "").strip().lstrip("@").lower()
 
@@ -56,6 +61,28 @@ def _is_expected_media_reply(
     )
 
 
+def route_telegram_media_fallback_reply(message: Any) -> bool:
+    """Route an incoming Telegram update to its waiting downloader request."""
+    chat = getattr(message, "chat", None)
+    chat_id = getattr(chat, "id", None)
+    reply_to_message_id = _reply_to_message_id(message)
+    if chat_id is None or reply_to_message_id is None:
+        return False
+
+    pending = _pending_replies.get((int(chat_id), int(reply_to_message_id)))
+    if pending is None:
+        return False
+
+    expected_username, queue = pending
+    sender = getattr(message, "from_user", None)
+    sender_username = normalize_bot_username(getattr(sender, "username", None))
+    if sender_username != expected_username:
+        return False
+
+    queue.put_nowait(message)
+    return True
+
+
 async def _delete_messages(*messages: Any) -> None:
     for message in messages:
         if message is None:
@@ -90,35 +117,37 @@ async def fetch_media_from_telegram_bot(
         disable_web_page_preview=True,
     )
     loop = asyncio.get_running_loop()
-    deadline = loop.time() + max(10, int(response_timeout))
+    deadline = loop.time() + max(0.1, float(response_timeout))
     last_reply_text = ""
+    pending_key = (int(source_chat_id), int(request.id))
+    reply_queue: asyncio.Queue[Any] = asyncio.Queue()
+    _pending_replies[pending_key] = (
+        normalize_bot_username(bot_username),
+        reply_queue,
+    )
 
     try:
         while loop.time() < deadline:
-            async for message in client.get_chat_history(int(source_chat_id), limit=30):
-                message_id = int(getattr(message, "id", 0) or 0)
-                if message_id <= int(request.id):
-                    break
-
-                sender = getattr(message, "from_user", None)
-                sender_username = normalize_bot_username(
-                    getattr(sender, "username", None)
+            remaining = deadline - loop.time()
+            try:
+                message = await asyncio.wait_for(
+                    reply_queue.get(),
+                    timeout=max(0.01, remaining),
                 )
-                if sender_username != normalize_bot_username(bot_username):
-                    continue
-                if _reply_to_message_id(message) != int(request.id):
-                    continue
+            except asyncio.TimeoutError:
+                break
 
-                if _is_expected_media_reply(
-                    message,
-                    command_message_id=request.id,
-                    bot_username=bot_username,
-                ):
-                    target_dir = (
-                        Path("downloads")
-                        / f"telegram_fallback_{request_chat_id}_{uuid.uuid4().hex[:10]}"
-                    )
-                    target_dir.mkdir(parents=True, exist_ok=True)
+            if _is_expected_media_reply(
+                message,
+                command_message_id=request.id,
+                bot_username=bot_username,
+            ):
+                target_dir = (
+                    Path("downloads")
+                    / f"telegram_fallback_{request_chat_id}_{uuid.uuid4().hex[:10]}"
+                )
+                target_dir.mkdir(parents=True, exist_ok=True)
+                try:
                     downloaded = await asyncio.wait_for(
                         client.download_media(
                             message,
@@ -126,26 +155,25 @@ async def fetch_media_from_telegram_bot(
                         ),
                         timeout=max(60, int(download_timeout)),
                     )
-                    if not downloaded:
-                        raise TelegramMediaFallbackError(
-                            "External downloader returned media but download failed"
-                        )
-                    if cleanup:
-                        await _delete_messages(message, request)
-                    return str(downloaded)
+                except asyncio.TimeoutError as error:
+                    raise TelegramMediaFallbackError(
+                        "Timed out while downloading the external bot result"
+                    ) from error
+                if not downloaded:
+                    raise TelegramMediaFallbackError(
+                        "External downloader returned media but download failed"
+                    )
+                if cleanup:
+                    await _delete_messages(message, request)
+                return str(downloaded)
 
-                reply_text = getattr(message, "text", None) or getattr(
-                    message, "caption", None
-                )
-                if reply_text:
-                    last_reply_text = str(reply_text).replace("\n", " ")[:300]
-
-            await asyncio.sleep(2)
-    except asyncio.TimeoutError as error:
-        raise TelegramMediaFallbackError(
-            "Timed out while downloading the external bot result"
-        ) from error
+            reply_text = getattr(message, "text", None) or getattr(
+                message, "caption", None
+            )
+            if reply_text:
+                last_reply_text = str(reply_text).replace("\n", " ")[:300]
     finally:
+        _pending_replies.pop(pending_key, None)
         if cleanup:
             await _delete_messages(request)
 
