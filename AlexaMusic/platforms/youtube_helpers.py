@@ -97,8 +97,20 @@ def build_attempts(
             )
         )
 
-    # web_safari can expose HLS without a GVS PO Token.  Keep the other
-    # configured clients as isolated anonymous fallbacks for public videos.
+    # Preserve yt-dlp's own default client selection.  This is intentionally
+    # different from an explicit web_safari attempt and restores the reliable
+    # audio path used before the specialized fallbacks were introduced.
+    attempts.append(
+        YouTubeAttempt(
+            YouTubeAuthStrategy.ANONYMOUS,
+            use_plugins=False,
+            use_cookies=False,
+            player_client=None,
+        )
+    )
+
+    # web_safari can expose HLS without a GVS PO Token. Keep the remaining
+    # configured clients as additional isolated fallbacks for public videos.
     anonymous_clients = tuple(client for client in clients if client != "mweb")
     if not anonymous_clients and not pot_enabled:
         anonymous_clients = clients
