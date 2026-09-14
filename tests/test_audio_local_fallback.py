@@ -41,6 +41,16 @@ class AudioLocalFallbackTest(unittest.TestCase):
             function,
         )
 
+    def test_separate_video_and_audio_urls_use_local_merge(self):
+        function = async_function_source(CALL_SOURCE, "_play_media_with_fallback")
+
+        self.assertIn("if video and audio_link and allow_local_fallback:", function)
+        self.assertIn("Separate YouTube A/V streams detected", function)
+        self.assertLess(
+            function.index("if video and audio_link and allow_local_fallback:"),
+            function.index("stream = _media_stream("),
+        )
+
     def test_finite_tracks_enable_local_fallback(self):
         function = async_function_source(CALL_SOURCE, "join_call")
 
