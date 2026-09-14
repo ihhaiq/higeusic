@@ -539,6 +539,7 @@ class YouTubeAPI:
         outtmpl: str,
         merge_format: str | None = None,
         extract_audio: bool = False,
+        extra_args: list[str] | None = None,
     ) -> str:
         Path("downloads").mkdir(parents=True, exist_ok=True)
         args = [
@@ -556,6 +557,8 @@ class YouTubeAPI:
             args.extend(
                 ["--extract-audio", "--audio-format", "mp3", "--audio-quality", "192K"]
             )
+        if extra_args:
+            args.extend(extra_args)
         args.append(link)
         output = await self._run_with_fallback(
             args,
@@ -590,6 +593,39 @@ class YouTubeAPI:
             ),
             outtmpl=f"downloads/stream_{chat_id}_{unique}_%(id)s.%(ext)s",
             merge_format="mp4",
+        )
+
+    async def download_stream_video_segment(
+        self,
+        link: str,
+        *,
+        chat_id: int,
+        start_seconds: int,
+        end_seconds: int,
+        segment_index: int,
+        max_height: int = 360,
+    ) -> str:
+        """Download one finite MP4 section for long-video pipelined playback."""
+        unique = uuid.uuid4().hex[:10]
+        height = max(144, min(int(max_height or 360), 720))
+        section = f"*{max(0, int(start_seconds))}-{max(1, int(end_seconds))}"
+        return await self._download_file(
+            link,
+            format_selector=(
+                f"bestvideo[ext=mp4][height<={height}]+bestaudio[ext=m4a]/"
+                f"bestvideo[height<={height}]+bestaudio/"
+                f"best[ext=mp4][height<={height}]/best[height<={height}]/best"
+            ),
+            outtmpl=(
+                f"downloads/segment_{chat_id}_{segment_index:04d}_{unique}_"
+                "%(id)s.%(ext)s"
+            ),
+            merge_format="mp4",
+            extra_args=[
+                "--download-sections",
+                section,
+                "--force-keyframes-at-cuts",
+            ],
         )
 
     async def download(
