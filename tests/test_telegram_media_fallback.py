@@ -1,4 +1,5 @@
 import importlib.util
+import asyncio
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -14,6 +15,9 @@ SPEC.loader.exec_module(telegram_fallback)
 
 build_downloader_command = telegram_fallback.build_downloader_command
 fetch_media_from_telegram_bot = telegram_fallback.fetch_media_from_telegram_bot
+route_telegram_media_fallback_reply = (
+    telegram_fallback.route_telegram_media_fallback_reply
+)
 
 
 class FakeMessage:
@@ -27,6 +31,7 @@ class FakeMessage:
         video=None,
         audio=None,
         text=None,
+        chat_id=-1001234567890,
     ):
         self.id = message_id
         self.from_user = (
@@ -39,6 +44,7 @@ class FakeMessage:
         self.audio = audio
         self.text = text
         self.caption = None
+        self.chat = SimpleNamespace(id=chat_id)
         self.deleted = False
 
     async def delete(self):
@@ -46,19 +52,25 @@ class FakeMessage:
 
 
 class FakeClient:
-    def __init__(self, history):
-        self.history = history
+    def __init__(self, replies):
+        self.replies = replies
         self.request = FakeMessage(100, username="MusicBot")
         self.sent = None
         self.downloaded_message = None
 
     async def send_message(self, chat_id, text, **kwargs):
         self.sent = (chat_id, text, kwargs)
+        async def deliver_replies():
+            await asyncio.sleep(0)
+            for message in self.replies:
+                route_telegram_media_fallback_reply(message)
+
+        asyncio.create_task(deliver_replies())
         return self.request
 
     async def get_chat_history(self, chat_id, limit):
-        for message in self.history:
-            yield message
+        raise AssertionError("Bot fallback must not read chat history")
+        yield
 
     async def download_media(self, message, file_name):
         self.downloaded_message = (message, file_name)
@@ -110,6 +122,30 @@ class TelegramMediaFallbackTest(unittest.IsolatedAsyncioTestCase):
         self.assertIs(client.downloaded_message[0], result)
         self.assertTrue(client.request.deleted)
         self.assertTrue(result.deleted)
+
+    async def test_timeout_unregisters_the_waiting_request(self):
+        client = FakeClient([])
+
+        with self.assertRaises(telegram_fallback.TelegramMediaFallbackError):
+            await fetch_media_from_telegram_bot(
+                client,
+                source_chat_id=-1001234567890,
+                bot_username="DownloaderBot",
+                command="/v",
+                link="https://youtu.be/example",
+                request_chat_id=-10099887766,
+                response_timeout=0.01,
+                cleanup=True,
+            )
+
+        late_reply = FakeMessage(
+            102,
+            username="DownloaderBot",
+            reply_to_message_id=100,
+            video=object(),
+        )
+        self.assertFalse(route_telegram_media_fallback_reply(late_reply))
+        self.assertTrue(client.request.deleted)
 
 
 if __name__ == "__main__":
