@@ -22,7 +22,7 @@ _GROUP_PICKER_TEXT = r"^(?:اضف مجموعة|أضف مجموعة|إضافة م
 
 
 def _allowed(user_id: int | None) -> bool:
-    return bool(user_id) and user_id not in config.BANNED_USERS and (
+    return bool(user_id) and (
         user_id == config.OWNER_ID or user_id in SUDOERS
     )
 
