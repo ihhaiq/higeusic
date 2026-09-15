@@ -9,6 +9,7 @@ from aiogram.types import CallbackQuery
 import config
 from AlexaMusic.logging import LOGGER
 from AlexaMusic.utils.database import get_lang
+from AlexaMusic.utils.playback_cancel import cancel_play_operation
 from AlexaMusic.utils.rich_stream import send_control_panel_ephemeral
 from strings import get_string
 
@@ -53,6 +54,52 @@ def _private_controls_allowed(callback) -> bool:
         and user_id not in config.BANNED_USERS
         and (user_id == config.OWNER_ID or user_id in SUDOERS)
     )
+
+
+@dispatcher.callback_query(F.data.startswith("PLAYCANCEL "))
+async def cancel_play_preparation(callback: CallbackQuery) -> None:
+    if not callback.data or not callback.from_user:
+        return
+    try:
+        token = callback.data.split(None, 1)[1].strip()
+    except Exception:
+        await _safe_answer(callback, "بيانات الإلغاء غير صالحة.", show_alert=True)
+        return
+
+    from AlexaMusic.misc import SUDOERS
+
+    user_id = int(callback.from_user.id)
+    privileged = (
+        {user_id}
+        if user_id == int(config.OWNER_ID) or user_id in SUDOERS
+        else set()
+    )
+    result = cancel_play_operation(
+        token,
+        user_id=user_id,
+        privileged_user_ids=privileged,
+    )
+    if result == "forbidden":
+        await _safe_answer(
+            callback,
+            "هذا الطلب يخص مستخدمًا آخر.",
+            show_alert=True,
+        )
+        return
+    if result == "missing":
+        await _safe_answer(
+            callback,
+            "انتهت العملية أو تم إلغاؤها مسبقًا.",
+            show_alert=True,
+        )
+        return
+
+    await _safe_answer(callback, "تم إلغاء العملية.")
+    if callback.message:
+        try:
+            await callback.message.edit_text("✖️ تم إلغاء العملية.")
+        except Exception:
+            pass
 
 
 @dispatcher.callback_query(F.data.startswith("RICHCTRL "))

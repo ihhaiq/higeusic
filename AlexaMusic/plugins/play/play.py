@@ -9,6 +9,7 @@ This program is free software: you can redistribute it and can modify
 as you want or you can collabe if you have new ideas.
 """
 
+import asyncio
 import random
 import string
 
@@ -35,6 +36,7 @@ from AlexaMusic.utils.inline.play import (
 )
 from AlexaMusic.utils.inline.playlist import botplaylist_markup
 from AlexaMusic.utils.logger import play_logs
+from AlexaMusic.utils.playback_cancel import cancel_markup, register_play_operation
 from AlexaMusic.utils.stream.stream import stream
 from config import BANNED_USERS, lyrical
 from strings import get_command
@@ -56,21 +58,19 @@ async def play_commnd(
     url,
     fplay,
 ):
-    return await play_media(
-        client, message, _, chat_id, video, channel, playmode, url, fplay
-    )
+    try:
+        return await play_media(
+            client, message, _, chat_id, video, channel, playmode, url, fplay
+        )
+    except asyncio.CancelledError:
+        # User-triggered PLAYCANCEL cancels this handler task and any nested
+        # yt-dlp/subprocess operation. The callback handler updates the message.
+        return None
 
 
 async def play_media(
     client, message, _, chat_id, video, channel, playmode, url, fplay, *, query=None
 ):
-    mystic = await message.reply_text(
-        _["play_2"].format(channel) if channel else _["play_1"]
-    )
-    plist_id = None
-    slider = None
-    plist_type = None
-    spotify = None
     if message.from_user:
         user_id = message.from_user.id
         user_name = message.from_user.first_name
@@ -78,6 +78,19 @@ async def play_media(
         # Channel posts don't expose the posting admin as from_user.
         user_id = config.OWNER_ID
         user_name = message.author_signature or message.chat.title or "Channel"
+
+    operation_token = register_play_operation(
+        user_id=user_id,
+        chat_id=chat_id,
+    )
+    mystic = await message.reply_text(
+        _["play_2"].format(channel) if channel else _["play_1"],
+        reply_markup=cancel_markup(operation_token),
+    )
+    plist_id = None
+    slider = None
+    plist_type = None
+    spotify = None
     audio_telegram = (
         (message.reply_to_message.audio or message.reply_to_message.voice)
         if message.reply_to_message
