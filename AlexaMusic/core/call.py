@@ -118,6 +118,34 @@ async def _download_long_video_segment(
         return path
 
 
+async def _prefetch_long_video_segment(
+    link: str,
+    *,
+    chat_id: int,
+    segment_index: int,
+    start_seconds: int,
+    end_seconds: int,
+) -> str:
+    delay = max(
+        0, int(getattr(config, "LONG_VIDEO_PREFETCH_DELAY_SEC", 45))
+    )
+    if delay:
+        LOGGER(__name__).info(
+            "Long-video prefetch delayed chat_id=%s segment=%s delay=%ss",
+            chat_id,
+            segment_index + 1,
+            delay,
+        )
+        await asyncio.sleep(delay)
+    return await _download_long_video_segment(
+        link,
+        chat_id=chat_id,
+        segment_index=segment_index,
+        start_seconds=start_seconds,
+        end_seconds=end_seconds,
+    )
+
+
 def _schedule_next_long_video_segment(chat_id: int) -> None:
     session = _long_video_sessions.get(chat_id)
     if not session or session.get("next_task") is not None:
@@ -131,7 +159,7 @@ def _schedule_next_long_video_segment(chat_id: int) -> None:
         start_seconds + int(session["segment_seconds"]),
     )
     session["next_task"] = asyncio.create_task(
-        _download_long_video_segment(
+        _prefetch_long_video_segment(
             session["link"],
             chat_id=chat_id,
             segment_index=segment_index,
