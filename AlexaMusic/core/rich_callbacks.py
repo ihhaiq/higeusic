@@ -68,11 +68,15 @@ async def cancel_play_preparation(callback: CallbackQuery) -> None:
 
     from AlexaMusic.misc import SUDOERS
 
-    privileged = set(SUDOERS)
-    privileged.add(int(config.OWNER_ID))
+    user_id = int(callback.from_user.id)
+    privileged = (
+        {user_id}
+        if user_id == int(config.OWNER_ID) or user_id in SUDOERS
+        else set()
+    )
     result = cancel_play_operation(
         token,
-        user_id=callback.from_user.id,
+        user_id=user_id,
         privileged_user_ids=privileged,
     )
     if result == "forbidden":
