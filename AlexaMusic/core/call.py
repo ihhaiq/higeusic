@@ -376,8 +376,51 @@ async def _play_media_with_fallback(
         "video" if video else "audio",
         "youtube" if youtube else "direct",
     )
-    attempts = YouTube.stream_attempts() if youtube else (None,)
     errors = []
+    duration_seconds = duration_to_seconds(duration)
+    long_video_threshold = (
+        max(0, int(getattr(config, "LONG_VIDEO_THRESHOLD_MIN", 30))) * 60
+    )
+    long_segmented_video = bool(
+        youtube
+        and video
+        and allow_local_fallback
+        and long_video_threshold
+        and duration_seconds >= long_video_threshold
+    )
+
+    if long_segmented_video:
+        LOGGER(__name__).info(
+            "Long video detected; bypassing expiring direct YouTube playback "
+            "and using segmented playback chat_id=%s duration=%s threshold=%s",
+            chat_id,
+            duration_seconds,
+            long_video_threshold,
+        )
+        try:
+            return await _start_segmented_long_video(
+                player,
+                chat_id,
+                link,
+                audio_quality=audio_quality,
+                video_quality=video_quality,
+                duration_seconds=duration_seconds,
+                group_config=group_config,
+            )
+        except Exception as error:
+            errors.append(error)
+            LOGGER(__name__).warning(
+                "Preferred segmented long-video playback failed chat_id=%s: %s",
+                chat_id,
+                str(error).replace("\n", " ")[-500:],
+            )
+            await _cancel_long_video_session(chat_id)
+
+    attempts = (
+        ()
+        if long_segmented_video
+        else (YouTube.stream_attempts() if youtube else (None,))
+    )
     for attempt in attempts:
         stream_link = link
         audio_link = None
@@ -448,34 +491,6 @@ async def _play_media_with_fallback(
     if youtube and allow_local_fallback:
         media_kind = "video" if video else "audio"
         media_label = "الفيديو" if video else "الصوت"
-
-        duration_seconds = duration_to_seconds(duration)
-        long_video_threshold = (
-            max(0, int(getattr(config, "LONG_VIDEO_THRESHOLD_MIN", 30))) * 60
-        )
-        if (
-            video
-            and long_video_threshold
-            and duration_seconds >= long_video_threshold
-        ):
-            try:
-                return await _start_segmented_long_video(
-                    player,
-                    chat_id,
-                    link,
-                    audio_quality=audio_quality,
-                    video_quality=video_quality,
-                    duration_seconds=duration_seconds,
-                    group_config=group_config,
-                )
-            except Exception as error:
-                errors.append(error)
-                LOGGER(__name__).warning(
-                    "Segmented long-video fallback failed chat_id=%s: %s",
-                    chat_id,
-                    str(error).replace("\n", " ")[-500:],
-                )
-                await _cancel_long_video_session(chat_id)
 
         async def play_downloaded_file(path):
             stream = _media_stream(
