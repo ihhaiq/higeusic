@@ -1,20 +1,9 @@
 from __future__ import annotations
 
 import asyncio
-from html import escape
-
 from aiogram import Bot, Dispatcher, F
-from aiogram.enums import ChatType, ParseMode
 from aiogram.exceptions import TelegramBadRequest
-from aiogram.filters import Command
-from aiogram.types import (
-    CallbackQuery,
-    KeyboardButton,
-    KeyboardButtonRequestChat,
-    Message,
-    ReplyKeyboardMarkup,
-    ReplyKeyboardRemove,
-)
+from aiogram.types import CallbackQuery
 
 import config
 from AlexaMusic.logging import LOGGER
@@ -24,9 +13,6 @@ from AlexaMusic.utils.rich_stream import send_control_panel_ephemeral
 from strings import get_string
 
 dispatcher = Dispatcher()
-
-CHAT_PICKER_REQUEST_ID = 20260916
-_CHAT_PICKER_TEXTS = {"اضف مجموعة", "أضف مجموعة", "إضافة مجموعة"}
 
 
 def _expired_callback(error: BaseException) -> bool:
@@ -75,112 +61,6 @@ def _private_controls_allowed(callback) -> bool:
     user_id = callback.from_user.id
     return message.chat.id == user_id and _is_privileged_user(user_id)
 
-
-def _group_picker_keyboard() -> ReplyKeyboardMarkup:
-    return ReplyKeyboardMarkup(
-        keyboard=[
-            [
-                KeyboardButton(
-                    text="➕ اختيار مجموعة",
-                    request_chat=KeyboardButtonRequestChat(
-                        request_id=CHAT_PICKER_REQUEST_ID,
-                        chat_is_channel=False,
-                        request_title=True,
-                        request_username=True,
-                    ),
-                )
-            ]
-        ],
-        resize_keyboard=True,
-        one_time_keyboard=True,
-        input_field_placeholder="اختر المجموعة الخاصة",
-    )
-
-
-@dispatcher.message(Command("addgroup"))
-@dispatcher.message(F.text.in_(_CHAT_PICKER_TEXTS))
-async def request_private_group(message: Message) -> None:
-    if message.chat.type != ChatType.PRIVATE:
-        return
-    if not message.from_user or not _is_privileged_user(message.from_user.id):
-        await message.answer(
-            "إضافة وجهات البث من الخاص متاحة لمالك البوت والمطورين المخوّلين فقط."
-        )
-        return
-
-    await message.answer(
-        "اضغط «اختيار مجموعة» ثم اختر المجموعة الخاصة التي يوجد فيها الحساب المساعد.",
-        reply_markup=_group_picker_keyboard(),
-    )
-
-
-@dispatcher.message(F.chat_shared)
-async def receive_private_group_selection(message: Message) -> None:
-    if (
-        message.chat.type != ChatType.PRIVATE
-        or not message.from_user
-        or not message.chat_shared
-        or message.chat_shared.request_id != CHAT_PICKER_REQUEST_ID
-    ):
-        return
-
-    if not _is_privileged_user(message.from_user.id):
-        await message.answer(
-            "إضافة وجهات البث من الخاص متاحة لمالك البوت والمطورين المخوّلين فقط.",
-            reply_markup=ReplyKeyboardRemove(),
-        )
-        return
-
-    chat_id = int(message.chat_shared.chat_id)
-
-    try:
-        from AlexaMusic.utils.private_play import (
-            prepare_private_assistant,
-            resolve_private_chat,
-        )
-
-        chat = await resolve_private_chat(chat_id)
-        await prepare_private_assistant(chat)
-    except Exception as error:
-        LOGGER(__name__).warning(
-            "Shared private group could not be resolved by assistant chat_id=%s: %s",
-            chat_id,
-            error,
-        )
-        await message.answer(
-            "تم استلام معرّف المجموعة، لكن الحساب المساعد لم يستطع الوصول إليها.\n\n"
-            f"ID: <code>{chat_id}</code>\n"
-            f"السبب: {escape(str(error).strip() or type(error).__name__)}",
-            parse_mode=ParseMode.HTML,
-            reply_markup=ReplyKeyboardRemove(),
-        )
-        return
-
-    from AlexaMusic.utils.database import add_private_chat, is_served_private_chat
-
-    already_authorized = await is_served_private_chat(chat_id)
-    if not already_authorized:
-        await add_private_chat(chat_id)
-
-    title = chat.title or message.chat_shared.title or "المجموعة المختارة"
-    authorization_line = (
-        "كانت المجموعة مصرّحة مسبقًا."
-        if already_authorized
-        else "تمت إضافة المجموعة تلقائيًا إلى وجهات البث المصرّحة."
-    )
-
-    await message.answer(
-        "✅ تم اختيار المجموعة بنجاح.\n\n"
-        f"الاسم: <b>{escape(title)}</b>\n"
-        f"ID: <code>{chat_id}</code>\n"
-        f"{authorization_line}\n"
-        "الحساب المساعد: ✅ موجود ويمكنه الوصول للمجموعة\n\n"
-        "تقدر الآن تستخدم المعرف مباشرة، مثل:\n"
-        f"<code>/play {chat_id} اسم الأغنية</code>\n"
-        f"<code>فيديو {chat_id} رابط_الفيديو</code>",
-        parse_mode=ParseMode.HTML,
-        reply_markup=ReplyKeyboardRemove(),
-    )
 
 
 @dispatcher.callback_query(F.data.startswith("PLAYCANCEL "))
@@ -383,7 +263,7 @@ async def handle_rich_control_action(callback: CallbackQuery) -> None:
 
 
 async def run_rich_callback_polling() -> None:
-    """Receive Bot API callbacks and service messages not exposed by Pyrogram/Kurigram."""
+    """Receive Bot API callbacks not exposed by Pyrogram/Kurigram."""
 
     bot = Bot(token=config.BOT_TOKEN)
     try:
@@ -392,11 +272,11 @@ async def run_rich_callback_polling() -> None:
         # a traceback loop after a Railway restart.
         await bot.delete_webhook(drop_pending_updates=True)
         LOGGER(__name__).info(
-            "Starting aiogram polling for rich controls and private chat selection."
+            "Starting aiogram callback polling for rich/ephemeral controls."
         )
         await dispatcher.start_polling(
             bot,
-            allowed_updates=["callback_query", "message"],
+            allowed_updates=["callback_query"],
             handle_signals=False,
         )
     except asyncio.CancelledError:

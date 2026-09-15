@@ -28,6 +28,7 @@ ALL_MODULES = [
     ".modules.id",
     ".modules.punishment",
     ".play.channel",
+    ".play.group_picker",
     ".play.live",
     ".play.play",
     ".play.playlist",
