@@ -34,6 +34,7 @@ async def _update_progress(
     media_label = "الفيديو" if video else "الصوت"
     failures = 0
     frame_index = 0
+    reply_markup = getattr(message, "reply_markup", None)
 
     while True:
         elapsed = format_elapsed(loop.time() - started)
@@ -43,7 +44,7 @@ async def _update_progress(
             f"⏱ الوقت المنقضي: `{elapsed}`"
         )
         try:
-            await message.edit_text(text)
+            await message.edit_text(text, reply_markup=reply_markup)
             failures = 0
         except asyncio.CancelledError:
             raise
