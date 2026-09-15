@@ -76,6 +76,8 @@ async def private_video(client, message):
                 client, message, language, chat.id, video, chat.title,
                 "Direct", url, None, query=request.query,
             )
+    except asyncio.CancelledError:
+        return
     except AssistantErr as error:
         await message.reply_text(str(error))
     except FloodWait as error:
