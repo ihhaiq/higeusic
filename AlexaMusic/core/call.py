@@ -147,26 +147,10 @@ async def _prefetch_long_video_segment(
 
 
 def _schedule_next_long_video_segment(chat_id: int) -> None:
-    session = _long_video_sessions.get(chat_id)
-    if not session or session.get("next_task") is not None:
-        return
-    segment_index = int(session["next_index"])
-    start_seconds = segment_index * int(session["segment_seconds"])
-    if start_seconds >= int(session["total_seconds"]):
-        return
-    end_seconds = min(
-        int(session["total_seconds"]),
-        start_seconds + int(session["segment_seconds"]),
-    )
-    session["next_task"] = asyncio.create_task(
-        _prefetch_long_video_segment(
-            session["link"],
-            chat_id=chat_id,
-            segment_index=segment_index,
-            start_seconds=start_seconds,
-            end_seconds=end_seconds,
-        )
-    )
+    # Intentionally do not prefetch while PyTgCalls/ffmpeg is streaming.
+    # Railway was OOM-killing the process when a second yt-dlp/ffmpeg job
+    # started in parallel with active video playback.
+    return
 
 
 async def _cancel_long_video_session(chat_id: int, *, remove_current: bool = True) -> None:
@@ -243,11 +227,34 @@ async def _continue_segmented_long_video(player, chat_id: int) -> bool:
     if not session:
         return False
     task = session.get("next_task")
-    if task is None:
-        await _cancel_long_video_session(chat_id)
-        return False
     try:
-        next_path = await task
+        if task is not None:
+            next_path = await task
+        else:
+            segment_index = int(session["next_index"])
+            start_seconds = segment_index * int(session["segment_seconds"])
+            if start_seconds >= int(session["total_seconds"]):
+                await _cancel_long_video_session(chat_id)
+                return False
+            end_seconds = min(
+                int(session["total_seconds"]),
+                start_seconds + int(session["segment_seconds"]),
+            )
+            LOGGER(__name__).info(
+                "Current segment ended; downloading next segment serially "
+                "chat_id=%s segment=%s range=%s-%s",
+                chat_id,
+                segment_index + 1,
+                start_seconds,
+                end_seconds,
+            )
+            next_path = await _download_long_video_segment(
+                session["link"],
+                chat_id=chat_id,
+                segment_index=segment_index,
+                start_seconds=start_seconds,
+                end_seconds=end_seconds,
+            )
     except asyncio.CancelledError:
         raise
     except Exception:
