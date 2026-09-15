@@ -620,9 +620,10 @@ class YouTubeAPI:
         return await self._download_file(
             link,
             format_selector=(
+                f"best[ext=mp4][acodec!=none][vcodec!=none][height<={height}]/"
+                f"best[acodec!=none][vcodec!=none][height<={height}]/"
                 f"bestvideo[ext=mp4][height<={height}]+bestaudio[ext=m4a]/"
-                f"bestvideo[height<={height}]+bestaudio/"
-                f"best[ext=mp4][height<={height}]/best[height<={height}]/best"
+                f"bestvideo[height<={height}]+bestaudio"
             ),
             outtmpl=(
                 f"downloads/segment_{chat_id}_{segment_index:04d}_{unique}_"
@@ -632,7 +633,6 @@ class YouTubeAPI:
             extra_args=[
                 "--download-sections",
                 section,
-                "--force-keyframes-at-cuts",
             ],
         )
 
